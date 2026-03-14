@@ -1,0 +1,72 @@
+services:
+  brain:
+    build: ./brain
+    container_name: aria-brain
+    ports:
+      - "${BRAIN_PORT:-11434}:11434"
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3n:e2b}
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - aria-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  memory:
+    build: ./memory
+    container_name: aria-memory
+    ports:
+      - "${MEMORY_PORT:-8001}:8001"
+    volumes:
+      - chroma_data:/app/chroma_data
+    networks:
+      - aria-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  orchestrator:
+    build: ./orchestrator
+    container_name: aria-orchestrator
+    ports:
+      - "${ORCHESTRATOR_PORT:-8000}:8000"
+    volumes:
+      - ./brain/prompts:/prompts:ro
+    environment:
+      - BRAIN_URL=http://brain:11434
+      - MEMORY_URL=http://memory:8001
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3n:e2b}
+      - SYSTEM_PROMPT_PATH=/prompts/aria.txt
+    depends_on:
+      brain:
+        condition: service_healthy
+      memory:
+        condition: service_healthy
+    networks:
+      - aria-net
+
+  frontend:
+    build: ./frontend
+    container_name: aria-frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      - VITE_WS_URL=ws://localhost:${ORCHESTRATOR_PORT:-8000}/ws
+    depends_on:
+      - orchestrator
+    networks:
+      - aria-net
+
+networks:
+  aria-net:
+    driver: bridge
+
+volumes:
+  ollama_data:
+  chroma_data:
