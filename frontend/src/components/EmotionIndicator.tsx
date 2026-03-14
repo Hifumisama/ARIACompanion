@@ -5,16 +5,13 @@ const EMOTION_COLORS: Record<string, string> = {
   sarcastic: "#7b68ee",   // violet — mode punchline
   furious: "#ff2020",     // rouge vif — HERCULE
   scheming: "#50c878",    // vert — mode pacte/contrat
-  menacing: "#8b0000",    // rouge sombre — menace froide
-  theatrical: "#daa520",  // or sombre — mode drama queen
 };
 
 interface Props {
   emotion: string;
-  intensity: number;
 }
 
-export function EmotionIndicator({ emotion, intensity }: Props) {
+export function EmotionIndicator({ emotion }: Props) {
   const color = EMOTION_COLORS[emotion] || EMOTION_COLORS.calm;
 
   return (
@@ -39,7 +36,6 @@ export function EmotionIndicator({ emotion, intensity }: Props) {
           height: 8,
           borderRadius: "50%",
           background: color,
-          opacity: 0.4 + intensity * 0.6,
         }}
       />
       {emotion}

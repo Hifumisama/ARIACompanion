@@ -3,7 +3,6 @@ export interface Message {
   role: "user" | "aria";
   text: string;
   emotion?: string;
-  intensity?: number;
   tone?: string;
   timestamp: number;
 }
@@ -12,7 +11,6 @@ export interface AriaResponse {
   type: "response";
   text: string;
   emotion: string;
-  intensity: number;
   tone: string;
 }
 

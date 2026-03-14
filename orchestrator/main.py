@@ -52,7 +52,6 @@ async def websocket_endpoint(ws: WebSocket):
             "type": "response",
             "text": greeting["text"],
             "emotion": greeting["emotion"],
-            "intensity": greeting["intensity"],
             "tone": greeting["tone"],
         })
     except Exception as e:
@@ -83,7 +82,6 @@ async def websocket_endpoint(ws: WebSocket):
                     "type": "response",
                     "text": response["text"],
                     "emotion": response["emotion"],
-                    "intensity": response["intensity"],
                     "tone": response["tone"],
                 })
             except Exception as e:

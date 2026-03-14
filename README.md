@@ -46,7 +46,7 @@ Copier `.env.example` vers `.env` et ajuster si besoin :
 
 ### v0.1 — Le cerveau qui parle (texte) `<-- ON EST ICI`
 - Orchestrator FastAPI + Ollama + ChromaDB + React chat
-- System prompt "Aria/Ripley" + réponses JSON (text + emotion + intensity + tone)
+- System prompt "Aria/Ripley" + réponses JSON (text + emotion + tone)
 - Mémoire court terme (conversations) + long terme (faits utilisateur)
 - UI : bulles de chat, indicateur d'émotion, statut "Aria réfléchit..."
 

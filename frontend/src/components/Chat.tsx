@@ -10,7 +10,6 @@ export function Chat() {
   const [thinking, setThinking] = useState(false);
   const [currentEmotion, setCurrentEmotion] = useState({
     emotion: "calm",
-    intensity: 0.5,
   });
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -26,7 +25,6 @@ export function Chat() {
       setThinking(false);
       setCurrentEmotion({
         emotion: lastMessage.emotion,
-        intensity: lastMessage.intensity,
       });
       setMessages((prev) => [
         ...prev,
@@ -35,7 +33,6 @@ export function Chat() {
           role: "aria",
           text: lastMessage.text,
           emotion: lastMessage.emotion,
-          intensity: lastMessage.intensity,
           tone: lastMessage.tone,
           timestamp: Date.now(),
         },
@@ -73,7 +70,7 @@ export function Chat() {
     try {
       await fetch("http://localhost:8000/memory/purge", { method: "DELETE" });
       setMessages([]);
-      setCurrentEmotion({ emotion: "neutral", intensity: 0.5 });
+      setCurrentEmotion({ emotion: "calm" });
     } catch {
       // ignore
     }
@@ -96,7 +93,6 @@ export function Chat() {
         <div className="header-right">
           <EmotionIndicator
             emotion={currentEmotion.emotion}
-            intensity={currentEmotion.intensity}
           />
           <button className="purge-btn" onClick={handlePurge} title="Purger la mémoire">
             purge

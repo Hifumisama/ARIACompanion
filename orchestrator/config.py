@@ -12,5 +12,5 @@ SYSTEM_PROMPT_PATH = os.getenv("SYSTEM_PROMPT_PATH", "/prompts/aria.txt")
 DEFAULT_SYSTEM_PROMPT = (
     "Tu es Aria, une IA compagnon au ton direct et sarcastique mais bienveillant. "
     "Réponds TOUJOURS en JSON : "
-    '{"text": "...", "emotion": "...", "intensity": 0.0-1.0, "tone": "..."}'
+    '{"text": "...", "emotion": "...", "tone": "..."}'
 )

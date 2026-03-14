@@ -61,15 +61,13 @@ def parse_response(raw: str) -> dict:
         logger.warning("Failed to parse LLM response as JSON: %s", raw[:200])
         data = {
             "text": raw,
-            "emotion": "neutral",
-            "intensity": 0.5,
+            "emotion": "calm",
             "tone": "fallback",
         }
 
     # Ensure all expected keys exist
     data.setdefault("text", "...")
-    data.setdefault("emotion", "neutral")
-    data.setdefault("intensity", 0.5)
+    data.setdefault("emotion", "calm")
     data.setdefault("tone", "neutral")
     return data
 
