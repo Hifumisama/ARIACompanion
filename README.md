@@ -38,7 +38,7 @@ Copier `.env.example` vers `.env` et ajuster si besoin :
 | `BRAIN_PORT` | 11434 | Port Ollama |
 | `MEMORY_PORT` | 8001 | Port du service mémoire |
 | `FRONTEND_PORT` | 5173 | Port du frontend |
-| `OLLAMA_MODEL` | gemma3:1b | Modèle LLM utilisé |
+| `OLLAMA_MODEL` | gemma3n:e4b | Modèle LLM utilisé |
 
 ---
 

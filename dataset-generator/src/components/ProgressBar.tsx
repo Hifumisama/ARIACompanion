@@ -68,7 +68,8 @@ const styles = {
     padding: '20px',
     backgroundColor: '#2a2a2a',
     borderRadius: '8px',
-    border: '1px solid #444'
+    border: '1px solid #444',
+    flex: 1
   } as React.CSSProperties,
   header: {
     display: 'flex',

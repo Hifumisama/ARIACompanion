@@ -19,6 +19,11 @@ export interface GenerationConfig {
   batchSize: number;
 }
 
+export interface AffinageEntry extends DatasetEntry {
+  judgeScore?: number;
+  judgeComment?: string;
+}
+
 export interface OllamaModel {
   name: string;
 }

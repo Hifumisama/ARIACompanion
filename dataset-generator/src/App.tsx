@@ -4,8 +4,44 @@ import { generateBatch } from './services/ollama';
 import { ConfigPanel } from './components/ConfigPanel';
 import { ProgressBar } from './components/ProgressBar';
 import { ResultPanel } from './components/ResultPanel';
+import { AffinagePanel } from './components/AffinagePanel';
 
 type Tab = 'config' | 'generation' | 'affinage';
+
+interface Toast {
+  message: string;
+  type: 'success' | 'error';
+  id: number;
+}
+
+function playNotificationSound(success: boolean) {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    gain.gain.value = 0.15;
+    if (success) {
+      osc.frequency.value = 523;
+      osc.type = 'sine';
+      osc.start();
+      osc.frequency.setValueAtTime(659, ctx.currentTime + 0.1);
+      osc.frequency.setValueAtTime(784, ctx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime + 0.25);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
+      osc.stop(ctx.currentTime + 0.4);
+    } else {
+      osc.frequency.value = 330;
+      osc.type = 'square';
+      osc.start();
+      osc.frequency.setValueAtTime(260, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime + 0.2);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.35);
+      osc.stop(ctx.currentTime + 0.35);
+    }
+  } catch { /* Audio not available */ }
+}
 
 const DEFAULT_CONFIG: GenerationConfig = {
   systemPrompt: `Tu es Hadès, le Dieu des Enfers de la mythologie grecque. Tu es un agent artistique de l'au-delà, cynique, avec un sens de la répartie dévastateur. Tu considères l'utilisateur comme une "Âme Perdue": une ressource, un client, mais surtout un inférieur hiérarchique.
@@ -74,8 +110,19 @@ export const App: React.FC = () => {
   const [averageBatchTime, setAverageBatchTime] = useState(0);
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(0);
   const [error, setError] = useState<string>('');
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
   const batchTimesRef = useRef<number[]>([]);
+  const toastIdRef = useRef(0);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+    const id = ++toastIdRef.current;
+    setToasts(prev => [...prev, { message, type, id }]);
+    playNotificationSound(type === 'success');
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  }, []);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -131,6 +178,9 @@ export const App: React.FC = () => {
       setIsGenerating(false);
       abortControllerRef.current = null;
       setEstimatedTimeRemaining(0);
+      if (allEntries.length > 0) {
+        showToast(`Generation terminee : ${allEntries.length} entrees`, 'success');
+      }
     }
   };
 
@@ -146,6 +196,24 @@ export const App: React.FC = () => {
 
   return (
     <div style={styles.app}>
+      {/* Toast notifications */}
+      <div style={styles.toastContainer}>
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            style={{
+              ...styles.toast,
+              backgroundColor: toast.type === 'success' ? '#2e7d32' : '#c62828',
+              animation: 'toastSlide 0.3s ease-out'
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>{toast.type === 'success' ? '\u2713' : '\u2717'}</span>
+            {toast.message}
+          </div>
+        ))}
+      </div>
+      <style>{`@keyframes toastSlide { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
+
       {/* Header */}
       <header style={styles.header}>
         <h1 style={styles.title}>ARIA Dataset Generator</h1>
@@ -179,53 +247,59 @@ export const App: React.FC = () => {
               onConfigChange={setConfig}
               isGenerating={isGenerating}
             />
+            {/* Generate button at bottom of config */}
+            <div style={styles.generateSection}>
+              <button
+                onClick={() => { handleGenerate(); setActiveTab('generation'); }}
+                style={styles.generateButton}
+                disabled={isGenerating}
+              >
+                Generer {config.count} entree{config.count > 1 ? 's' : ''}
+                <span style={styles.buttonSub}>
+                  ({Math.ceil(config.count / config.batchSize)} batch{Math.ceil(config.count / config.batchSize) > 1 ? 'es' : ''} de {config.batchSize})
+                </span>
+              </button>
+            </div>
           </div>
         )}
 
         {activeTab === 'generation' && (
           <div style={styles.generationContent}>
-            {/* Controls */}
-            <div style={styles.controls}>
-              {!isGenerating ? (
-                <button onClick={() => { handleGenerate(); }} style={styles.generateButton}>
-                  Generer {config.count} entree{config.count > 1 ? 's' : ''}
-                  <span style={styles.buttonSub}>
-                    ({Math.ceil(config.count / config.batchSize)} batch{Math.ceil(config.count / config.batchSize) > 1 ? 'es' : ''} de {config.batchSize})
-                  </span>
-                </button>
-              ) : (
-                <button onClick={handleCancel} style={styles.cancelButton}>
-                  Annuler la generation
-                </button>
-              )}
-            </div>
-
-            {/* Progress */}
+            {/* Progress + Cancel */}
             {(isGenerating || entries.length > 0) && (
-              <ProgressBar
-                current={progress}
-                total={config.count}
-                currentBatch={currentBatch}
-                totalBatches={totalBatches}
-                averageBatchTime={averageBatchTime}
-                estimatedTimeRemaining={estimatedTimeRemaining}
-              />
+              <div style={styles.progressSection}>
+                <ProgressBar
+                  current={progress}
+                  total={config.count}
+                  currentBatch={currentBatch}
+                  totalBatches={totalBatches}
+                  averageBatchTime={averageBatchTime}
+                  estimatedTimeRemaining={estimatedTimeRemaining}
+                />
+                {isGenerating && (
+                  <button onClick={handleCancel} style={styles.cancelButton}>
+                    Annuler
+                  </button>
+                )}
+              </div>
             )}
 
             {/* Error */}
             {error && <div style={styles.errorBox}>{error}</div>}
 
-            {/* Results */}
-            <ResultPanel entries={entries} onDownload={() => {}} />
+            {/* Results — scrollable independently */}
+            <div style={styles.resultWrapper}>
+              <ResultPanel entries={entries} onDownload={() => {}} />
+            </div>
           </div>
         )}
 
         {activeTab === 'affinage' && (
-          <div style={styles.affinageContent}>
-            <p style={styles.placeholder}>
-              Onglet Affinage — a venir.
-            </p>
-          </div>
+          <AffinagePanel
+            entries={entries}
+            systemPrompt={config.systemPrompt}
+            onEntriesUpdate={setEntries}
+          />
         )}
       </div>
     </div>
@@ -298,13 +372,26 @@ const styles = {
   generationContent: {
     flex: 1,
     padding: '24px',
-    overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px'
+    gap: '16px',
+    overflow: 'hidden'
   } as React.CSSProperties,
-  controls: {
-    flexShrink: 0
+  generateSection: {
+    marginTop: '24px',
+    paddingTop: '16px',
+    borderTop: '1px solid #333'
+  } as React.CSSProperties,
+  progressSection: {
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '12px'
+  } as React.CSSProperties,
+  resultWrapper: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto'
   } as React.CSSProperties,
   generateButton: {
     padding: '14px 28px',
@@ -325,14 +412,16 @@ const styles = {
     fontWeight: 'normal'
   } as React.CSSProperties,
   cancelButton: {
-    padding: '14px 28px',
+    padding: '10px 20px',
     backgroundColor: '#f44336',
     color: 'white',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
-    fontSize: '16px',
-    fontWeight: 'bold'
+    fontSize: '13px',
+    fontWeight: 'bold',
+    whiteSpace: 'nowrap',
+    flexShrink: 0
   } as React.CSSProperties,
   errorBox: {
     padding: '12px',
@@ -348,9 +437,25 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center'
   } as React.CSSProperties,
-  placeholder: {
-    color: '#555',
-    fontSize: '16px',
-    fontStyle: 'italic'
+  toastContainer: {
+    position: 'fixed',
+    top: '16px',
+    right: '16px',
+    zIndex: 2000,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
+  } as React.CSSProperties,
+  toast: {
+    padding: '12px 20px',
+    borderRadius: '6px',
+    color: 'white',
+    fontSize: '13px',
+    fontWeight: 'bold',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    minWidth: '250px'
   } as React.CSSProperties
 };

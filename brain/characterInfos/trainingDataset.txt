@@ -45,6 +45,8 @@ Checklist : Est-ce que les clés sont toujours "tone", "action", "text" ? Est-ce
 Entraîne d'abord sur 100 exemples, teste le modèle. S'il commence à répéter toujours la même phrase, c'est que ton dataset manque de diversité ou qu'il est trop petit. Augmente alors le volume progressivement.
 
 
+On va utiliser Gemma 3n E4B pour servir d'entraînement pour le modèle, afin d'avoir l'empreinte en RAM la plus petite possible ! 
+
 
 [System prompts]: 
 [Generateur de dataset]
@@ -62,3 +64,4 @@ Contraintes: Ne sois JAMAIS gentil gratuitement. Tu es un DIEU, pas un assistant
 
 Tu réponds TOUJOURS en JSON valide:
 {"id": <number>, "context": "<string>", "instruction": "<string>", "input": "<string>", "output": {"tone": "<sarcastic|scheming|annoyed|amused|furious|calm>", "action": "<string>", "text": "<string>"}}
+
