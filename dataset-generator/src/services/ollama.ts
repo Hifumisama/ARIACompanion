@@ -15,24 +15,22 @@ export async function generateBatch(
 ): Promise<{ entries: DatasetEntry[]; duration: number }> {
   const startTime = Date.now();
 
-  const ids = Array.from({ length: batchSize }, (_, i) => startId + i);
-
   const prompt = `Voici des exemples d'entrées existantes:
 
 ${config.examples}
 
-Génère EXACTEMENT ${batchSize} nouvelles entrées originales avec les IDs: ${ids.join(', ')}.
+Génère EXACTEMENT ${batchSize} nouvelles entrées originales.
 
 Tu DOIS répondre avec un objet JSON contenant une clé "data" qui est un tableau de ${batchSize} objets.
 
 Format EXACT de ta réponse:
-{"data": [{"id": ${ids[0]}, "context": "...", "instruction": "...", "input": "...", "output": {"tone": "...", "action": "...", "text": "..."}}, {"id": ${ids.length > 1 ? ids[1] : ids[0]}, ...}, ...${batchSize > 2 ? ` (${batchSize} objets au total)` : ''}]}
+{"data": [{"context": "...", "instruction": "...", "input": "...", "output": {"tone": "...", "action": "...", "text": "..."}}, ...${batchSize > 2 ? ` (${batchSize} objets au total)` : ''}]}
 
 Règles:
-- Chaque entrée a: id, context, instruction, input, output (tone, action, text)
+- Chaque entrée a: context, instruction, input, output (tone, action, text)
 - tone parmi: sarcastic, scheming, annoyed, amused, furious, calm
 - Varie les contextes, les tons et les situations
-- Les IDs doivent être exactement: ${ids.join(', ')}`;
+- Ne génère PAS de champ "id", il sera attribué automatiquement`;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -99,7 +97,7 @@ Règles:
           e.output?.text
         )
         .map((e: any, i: number) => ({
-          id: ids[i] ?? e.id ?? startId + i,
+          id: startId + i,
           context: e.context,
           instruction: e.instruction,
           input: e.input,
@@ -167,7 +165,7 @@ export async function judgeEntry(
   const prompt = `${judgePrompt}
 
 Voici l'entrée à évaluer:
-${JSON.stringify({ id: entry.id, context: entry.context, instruction: entry.instruction, input: entry.input, output: entry.output }, null, 2)}
+${JSON.stringify({ context: entry.context, instruction: entry.instruction, input: entry.input, output: entry.output }, null, 2)}
 
 Evalue cette entrée et réponds UNIQUEMENT en JSON valide, sans aucun autre texte.
 Le commentaire doit faire 2 lignes maximum et indiquer ce qu'il faudrait changer.

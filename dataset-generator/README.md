@@ -68,10 +68,30 @@ L'onglet affinage permet d'évaluer, éditer et améliorer les entrées génér�
   - Le score est remis à zéro après régénération
 - **Éditer** : modale d'édition manuelle par entrée (tous les champs sauf l'ID)
 - **Supprimer** : supprime les entrées sélectionnées
+- **Mode Tinder** : tri rapide des entrées par swipe (voir section dédiée)
 
 **Commentaire du juge :**
 - Visible dans la vue détaillée de chaque entrée (sous input/output)
 - Indique le modèle utilisé (ex: "Commentaire du juge (qwen3:8b)")
+
+### 6. Mode Tinder (tri rapide)
+
+Accessible depuis le bouton "Mode Tinder" dans la toolbar de l'onglet Affinage. Permet de trier rapidement un dataset en deux listes (liked/disliked).
+
+**Interface :**
+- **Carte centrale** affichant tous les champs de l'entrée courante (context, instruction, input, output, score/commentaire du juge)
+- **Deux boutons de swipe** : dislike (rouge) et like (vert)
+- **Raccourcis clavier** : flèche gauche = dislike, flèche droite = like
+- **Deux listes latérales** : disliked (rouge, à gauche) et liked (vert, à droite) avec accordéon dépliable
+- **Bouton de correction** par entrée pour déplacer vers la liste opposée
+- **Compteur de progression** sous la carte
+
+**À la fin du tri :**
+- **Télécharger les liked** : exporte le JSON des entrées liked uniquement, puis retour au mode classique
+- **Régénérer les disliked** : ouvre la modale de régénération existante, puis retour au mode classique (les entrées régénérées sont prêtes pour un nouveau round Tinder)
+- **Retour au mode classique** : quitte le mode Tinder sans action
+
+Le bouton "Quitter le mode Tinder" est toujours accessible en haut pour sortir à tout moment.
 
 ## Architecture
 
@@ -88,6 +108,7 @@ L'onglet affinage permet d'évaluer, éditer et améliorer les entrées génér�
   - `ProgressBar.tsx` — Barre de progression + estimations
   - `ResultPanel.tsx` — Accordéon + mode brut + pagination
   - `AffinagePanel.tsx` — Tableau, modales (édition/analyse/régénération), tri, import/export
+  - `TinderMode.tsx` — Mode Tinder : swipe like/dislike, listes latérales, écran de complétion
 
 ## Format attendu
 
@@ -113,3 +134,4 @@ Chaque entrée doit suivre ce schéma:
 - Parsing JSON robuste : gère les balises `<think>` (Qwen), les blocs markdown, et les réponses mal formées
 - Notifications sonores via Web Audio API (pas de fichier audio nécessaire)
 - L'affinage utilise un type `AffinageEntry` qui étend `DatasetEntry` — les scores/commentaires ne sont pas inclus dans l'export JSON
+- **Les IDs sont toujours attribués côté frontend**, jamais par l'IA, pour éviter les doublons après régénération

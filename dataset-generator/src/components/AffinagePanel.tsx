@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { DatasetEntry, AffinageEntry } from '../types';
 import { fetchAvailableModels, judgeEntry, regenerateEntry, generateJudgePrompt } from '../services/ollama';
+import { TinderMode } from './TinderMode';
 
 interface AffinagePanelProps {
   entries: DatasetEntry[];
@@ -65,6 +66,9 @@ export const AffinagePanel: React.FC<AffinagePanelProps> = ({
   const [scoreSort, setScoreSort] = useState<SortOrder>('none');
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastIdRef = useRef(0);
+
+  // Tinder mode
+  const [tinderMode, setTinderMode] = useState(false);
 
   // Modal state
   const [modalType, setModalType] = useState<ModalType>(null);
@@ -354,6 +358,71 @@ export const AffinagePanel: React.FC<AffinagePanelProps> = ({
     return e?.judgeComment;
   });
 
+  // Tinder mode callbacks
+  const handleTinderDownloadLiked = (liked: AffinageEntry[]) => {
+    const cleanEntries = liked.map(({ judgeScore, judgeComment, ...rest }) => rest);
+    const dataStr = JSON.stringify(cleanEntries, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `dataset_liked_${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`${cleanEntries.length} entrees liked exportees`, 'success');
+    setTinderMode(false);
+  };
+
+  const handleTinderRegenerateDisliked = (dislikedEntries: AffinageEntry[]) => {
+    // Pre-select the disliked entries and open the regeneration modal
+    setSelectedIds(new Set(dislikedEntries.map(e => e.id)));
+    setModalPrompt('');
+    setModalModel(models[0] || '');
+    setUseJudgeComments(false);
+    setModalType('regenerate');
+    // We stay in tinder mode — after regeneration the entries will be updated
+    // and the user can re-enter tinder mode with fresh entries
+    setTinderMode(false);
+  };
+
+  // Tinder mode render
+  if (tinderMode) {
+    return (
+      <div style={styles.container}>
+        {/* Toast notifications */}
+        <div style={styles.toastContainer}>
+          {toasts.map(toast => (
+            <div
+              key={toast.id}
+              style={{
+                ...styles.toast,
+                backgroundColor: toast.type === 'success' ? '#2e7d32' : '#c62828',
+                animation: 'toastSlide 0.3s ease-out'
+              }}
+            >
+              <span style={styles.toastIcon}>{toast.type === 'success' ? '\u2713' : '\u2717'}</span>
+              {toast.message}
+            </div>
+          ))}
+        </div>
+        <TinderMode
+          entries={affinageEntries}
+          onExit={() => setTinderMode(false)}
+          onDownloadLiked={handleTinderDownloadLiked}
+          onRegenerateDisliked={handleTinderRegenerateDisliked}
+        />
+        <style>{`
+          @keyframes toastSlide {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.container}>
       {/* Toast notifications */}
@@ -385,6 +454,13 @@ export const AffinagePanel: React.FC<AffinagePanelProps> = ({
             disabled={affinageEntries.length === 0}
           >
             Exporter JSON
+          </button>
+          <button
+            onClick={() => setTinderMode(true)}
+            style={{ ...styles.btnSecondary, backgroundColor: '#FF9800' }}
+            disabled={affinageEntries.length === 0 || isProcessing}
+          >
+            Mode Tinder
           </button>
         </div>
         <div style={styles.toolbarRight}>
