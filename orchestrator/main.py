@@ -1,13 +1,13 @@
 import json
 import logging
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 
-import httpx
-
-from config import MEMORY_URL
 from pipeline import process_message
+from services.memory import memory
+from services import stt, tts
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("aria")
@@ -28,12 +28,28 @@ def health():
 
 
 @app.delete("/memory/purge")
-async def purge_memory():
-    """Proxy purge request to memory service."""
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.delete(f"{MEMORY_URL}/memory/purge")
-        resp.raise_for_status()
-        return resp.json()
+def purge_memory():
+    """Purge all conversation memory."""
+    memory.purge()
+    return {"status": "purged"}
+
+
+@app.post("/stt")
+async def speech_to_text(file: UploadFile):
+    """Transcribe uploaded audio to text."""
+    audio_bytes = await file.read()
+    text = stt.transcribe(audio_bytes)
+    return {"text": text}
+
+
+@app.post("/tts")
+async def text_to_speech(body: dict):
+    """Synthesize text to WAV audio."""
+    text = body.get("text", "")
+    if not text:
+        return Response(status_code=400, content="Missing 'text' field")
+    audio_bytes = tts.synthesize(text)
+    return Response(content=audio_bytes, media_type="audio/wav")
 
 
 @app.websocket("/ws")

@@ -1,12 +1,11 @@
-FROM ollama/ollama:latest
-
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+FROM ghcr.io/ggerganov/llama.cpp:server
 
 COPY prompts/ /prompts/
+COPY entrypoint.sh /entrypoint.sh
 
-EXPOSE 11434
+USER root
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 8080
 
 ENTRYPOINT ["/entrypoint.sh"]

@@ -1,3 +1,0 @@
-chromadb==0.6.3
-fastapi==0.115.11
-uvicorn==0.34.0

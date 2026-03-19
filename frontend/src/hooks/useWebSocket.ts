@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ServerMessage } from "../types";
 
-const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8000/ws";
+const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:4545/ws";
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);

@@ -1,76 +1,177 @@
 # ARIA Companion
 
-**Artificial Responsive Interactive Agent** — Un compagnon IA 100% local, avec la personnalité d'une badass bienveillante inspirée d'Ellen Ripley.
+**Artificial Responsive Interactive Agent** — Un compagnon IA 100% local incarnant Hades, dieu des Enfers. Cynique, sarcastique, et amateur de contrats douteux.
 
 ## Architecture
 
 ```
-Frontend (React/Vite) <──WebSocket──> Orchestrator (FastAPI) ──> Ollama (Gemma 3 1B)
-                                            │
-                                            v
-                                      Memory (ChromaDB)
+Frontend (React/Vite)
+  ├── WebSocket /ws ──────► Orchestrator (FastAPI)
+  ├── POST /stt (audio) ──►   ├── faster-whisper (STT)
+  └── POST /tts (texte) ──►   ├── piper-tts (TTS)
+                               ├── memoire glissante (JSON)
+                               └──► Brain (llama-server)
 ```
 
-4 conteneurs Docker sur un réseau `aria-net` :
-- **brain** — Ollama + modèle Gemma 3 1B instruct
-- **memory** — ChromaDB avec wrapper FastAPI (mémoire court/long terme)
-- **orchestrator** — FastAPI + WebSocket, pipeline de traitement des messages
-- **frontend** — React + Vite + TypeScript, UI de chat minimaliste
+3 conteneurs Docker sur un reseau `aria-net` :
+- **brain** — llama.cpp (`llama-server`) avec modele GGUF
+- **orchestrator** — FastAPI + WebSocket + STT (faster-whisper) + TTS (piper)
+- **frontend** — React 19 + Vite + TypeScript, UI de chat avec audio
 
-## Quickstart
+## Installation
+
+### 1. Cloner et configurer
 
 ```bash
-# Cloner et lancer
+git clone <repo-url>
 cd ARIACompanion
+cp .env.example .env
+```
+
+### 2. Telecharger un modele LLM (format GGUF)
+
+Placer un fichier `.gguf` dans `brain/models/` :
+
+```bash
+# Exemple avec Gemma 2 2B (quantise Q4_K_M, ~1.5 Go)
+huggingface-cli download bartowski/gemma-2-2b-it-GGUF \
+  --include "gemma-2-2b-it-Q4_K_M.gguf" \
+  --local-dir brain/models/
+
+mv brain/models/gemma-2-2b-it-Q4_K_M.gguf brain/models/model.gguf
+```
+
+> N'importe quel modele GGUF compatible llama.cpp fonctionne.
+> Adapter `MODEL_FILE` dans `.env` si le nom du fichier est different.
+
+### 3. Telecharger une voix Piper (TTS)
+
+Placer les fichiers `.onnx` et `.onnx.json` dans `models/piper/` :
+
+```bash
+cd models/piper
+
+# Voix francaise (siwis, qualite medium)
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx.json
+
+mv fr_FR-siwis-medium.onnx model.onnx
+mv fr_FR-siwis-medium.onnx.json model.onnx.json
+
+cd ../..
+```
+
+> Catalogue complet des voix : https://huggingface.co/rhasspy/piper-voices
+
+### 4. Modele Whisper (STT)
+
+Telecharge automatiquement au premier lancement. Par defaut : modele `small` (~460 Mo).
+
+Configurable via `WHISPER_MODEL` dans `.env` :
+- `tiny` (~75 Mo) — rapide, qualite basique
+- `base` (~140 Mo) — bon compromis vitesse/qualite
+- `small` (~460 Mo) — recommande pour le francais
+- `medium` (~1.5 Go) — meilleure qualite, plus lent
+
+### 5. Lancer
+
+```bash
 docker compose up --build
 ```
 
-Premier lancement : ~5 min (téléchargement du modèle ~800 MB).
-Puis ouvrir **http://localhost:5173**.
+Ouvrir **http://localhost:5173**
 
 ## Configuration
 
-Copier `.env.example` vers `.env` et ajuster si besoin :
+Toutes les variables sont dans `.env` :
 
-| Variable | Default | Description |
-|---|---|---|
-| `ORCHESTRATOR_PORT` | 8000 | Port de l'orchestrateur |
-| `BRAIN_PORT` | 11434 | Port Ollama |
-| `MEMORY_PORT` | 8001 | Port du service mémoire |
-| `FRONTEND_PORT` | 5173 | Port du frontend |
-| `OLLAMA_MODEL` | gemma3n:e4b | Modèle LLM utilisé |
+```env
+# Ports
+ORCHESTRATOR_PORT=4545    # API + WebSocket
+BRAIN_PORT=8080           # llama-server
+FRONTEND_PORT=5173        # Interface web
+
+# LLM (llama.cpp)
+MODEL_FILE=model.gguf     # Fichier dans brain/models/
+GPU_LAYERS=0              # 0 = CPU only, 99 = tout sur GPU
+CONTEXT_SIZE=4096         # Taille de la fenetre de contexte
+THREADS=4                 # Threads CPU
+
+# Memoire
+SUMMARY_INTERVAL=10       # Resume automatique tous les N messages
+
+# STT
+WHISPER_MODEL=small       # tiny|base|small|medium|large-v3
+WHISPER_LANGUAGE=fr
+```
+
+## Utilisation
+
+- **Texte** : taper dans la barre de saisie et envoyer
+- **Voix** : cliquer sur MIC, parler, re-cliquer pour envoyer
+- **VOX/MUTE** : activer/couper la synthese vocale des reponses
+- **Purge** : effacer toute la memoire conversationnelle
+
+## Structure du projet
+
+```
+ARIACompanion/
+├── brain/
+│   ├── models/           # Modeles GGUF (gitignore)
+│   ├── prompts/aria.txt  # System prompt de Hades
+│   ├── Dockerfile        # llama-server
+│   └── entrypoint.sh
+├── orchestrator/
+│   ├── services/
+│   │   ├── brain.py      # Client LLM (OpenAI API)
+│   │   ├── memory.py     # Memoire glissante (JSON)
+│   │   ├── stt.py        # Speech-to-Text (faster-whisper)
+│   │   └── tts.py        # Text-to-Speech (piper)
+│   ├── pipeline.py       # Pipeline de traitement
+│   ├── main.py           # FastAPI + WebSocket
+│   └── config.py
+├── frontend/
+│   └── src/
+│       ├── components/Chat.tsx
+│       └── hooks/
+│           ├── useWebSocket.ts
+│           ├── useAudioRecording.ts
+│           └── useAudioPlayback.ts
+├── models/
+│   └── piper/            # Voix Piper (gitignore)
+├── dataset-generator/    # Outil de generation de datasets
+├── docker-compose.yml
+└── .env
+```
 
 ---
 
 ## Roadmap
 
-### v0.1 — Le cerveau qui parle (texte) `<-- ON EST ICI`
-- Orchestrator FastAPI + Ollama + ChromaDB + React chat
-- System prompt "Aria/Ripley" + réponses JSON (text + emotion + tone)
-- Mémoire court terme (conversations) + long terme (faits utilisateur)
-- UI : bulles de chat, indicateur d'émotion, statut "Aria réfléchit..."
+### v0.1 — Le cerveau qui parle (texte)
+- Orchestrator FastAPI + llama.cpp + memoire glissante + React chat
+- System prompt "Hades" + reponses JSON (text + emotion + tone)
+- Resume automatique de la conversation
 
-### v0.2 — La voix
-- Service STT (faster-whisper) — speech-to-text local
-- Service TTS (Piper) — text-to-speech avec voix custom
+### v0.2 — La voix `<-- ON EST ICI`
+- STT (faster-whisper) — speech-to-text local sur CPU
+- TTS (piper) — text-to-speech avec voix configurable
 - Pipeline : audio → texte → brain → texte → audio
-- Nouveau conteneur Docker pour chaque service audio
 
 ### v0.3 — L'interaction naturelle
-- Full-duplex WebSocket streaming (parler et écouter en même temps)
-- VAD (Voice Activity Detection) — détecter quand l'utilisateur parle
-- Interruption par mot-clé "Stop" ou en parlant par-dessus
-- Gestion de la priorité utilisateur (Aria se tait quand on l'interrompt)
+- Full-duplex WebSocket streaming (parler et ecouter en meme temps)
+- VAD (Voice Activity Detection) — detecter quand l'utilisateur parle
+- Interruption par mot-cle ou en parlant par-dessus
 
-### v0.4 — La personnalité
-- Construction d'un dataset LoRA pour le roleplay Aria
-- Fine-tuning de Gemma pour coller parfaitement au personnage
-- Enrichissement du format émotions (plus de nuances, mémoire émotionnelle)
+### v0.4 — La personnalite
+- Construction d'un dataset LoRA pour le roleplay Hades
+- Fine-tuning avec adaptateur LoRA (chargeable dans llama.cpp)
+- Enrichissement du format emotions
 
 ### v0.5 — L'avatar
-- Affichage d'un avatar 2D/3D animé dans le frontend
-- Animations basées sur le JSON emotion/tone (expressions faciales, gestuelles)
-- Synchronisation lèvres avec le TTS
+- Affichage d'un avatar 2D/3D anime dans le frontend
+- Animations basees sur le JSON emotion/tone
+- Synchronisation levres avec le TTS
 
 ---
 
@@ -78,8 +179,10 @@ Copier `.env.example` vers `.env` et ajuster si besoin :
 
 | Couche | Techno |
 |---|---|
-| LLM | Ollama + Gemma 3 1B |
-| Mémoire | ChromaDB (embeddings all-MiniLM-L6-v2) |
+| LLM | llama.cpp (llama-server) |
+| STT | faster-whisper (CPU, int8) |
+| TTS | piper-tts (ONNX) |
+| Memoire | Resume glissant (JSON) |
 | Backend | FastAPI (Python 3.11) |
 | Frontend | React 19 + Vite + TypeScript |
 | Infra | Docker Compose |

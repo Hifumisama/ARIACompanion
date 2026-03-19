@@ -208,6 +208,54 @@ body {
   cursor: not-allowed;
 }
 
+/* Mic button */
+.mic-btn {
+  padding: 10px 14px !important;
+  background: #333 !important;
+  font-size: 11px !important;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  min-width: 52px;
+}
+
+.mic-btn:hover:not(:disabled) {
+  background: #444 !important;
+}
+
+.mic-btn.recording {
+  background: #c0392b !important;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.mic-btn.transcribing {
+  background: #555 !important;
+  opacity: 0.7;
+}
+
+/* TTS toggle button */
+.tts-btn {
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: transparent;
+  color: #777;
+  font-size: 11px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+}
+
+.tts-btn.active {
+  border-color: #4caf50;
+  color: #4caf50;
+}
+
+.tts-btn:hover {
+  border-color: #aaa;
+  color: #aaa;
+}
+
 /* Scrollbar */
 .messages::-webkit-scrollbar {
   width: 6px;

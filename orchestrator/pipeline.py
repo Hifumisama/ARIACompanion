@@ -3,7 +3,8 @@ import logging
 import pathlib
 
 from config import DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_PATH
-from services import brain, memory
+from services import brain
+from services.memory import memory
 
 logger = logging.getLogger("aria.pipeline")
 
@@ -19,19 +20,31 @@ def load_system_prompt() -> str:
 SYSTEM_PROMPT = load_system_prompt()
 logger.info("System prompt loaded (%d chars): %s...", len(SYSTEM_PROMPT), SYSTEM_PROMPT[:80])
 
+SUMMARY_PROMPT = (
+    "Tu es un assistant qui résume des conversations. "
+    "Produis un résumé concis en français qui conserve : "
+    "les informations clés sur l'utilisateur, le contexte important, "
+    "les décisions prises, et le ton de la relation. "
+    "Réponds UNIQUEMENT avec le résumé, sans formatage JSON."
+)
+
 
 def build_context_prompt(
     user_message: str,
-    recent: list[dict],
+    context: dict,
 ) -> str:
-    """Build the full prompt with recent conversation context."""
+    """Build the full prompt with summary + recent conversation context."""
     parts: list[str] = []
 
-    if recent:
-        parts.append("=== Conversation récente ===")
-        for msg in reversed(recent):
-            role = msg.get("metadata", {}).get("role", "?")
-            parts.append(f"[{role}] {msg['text']}")
+    if context["summary"]:
+        parts.append("=== Résumé de la conversation ===")
+        parts.append(context["summary"])
+        parts.append("")
+
+    if context["recent"]:
+        parts.append("=== Messages récents ===")
+        for msg in context["recent"]:
+            parts.append(f"[{msg['role']}] {msg['text']}")
 
     parts.append(f"\n[user] {user_message}")
     return "\n".join(parts)
@@ -72,13 +85,47 @@ def parse_response(raw: str) -> dict:
     return data
 
 
-async def process_message(user_message: str) -> dict:
-    """Full pipeline: memory lookup → LLM call → memory store → return."""
-    # 1. Get recent conversation for context
-    recent = await memory.get_recent(limit=10)
+async def maybe_summarize():
+    """If enough messages have accumulated, generate a sliding summary."""
+    if not memory.needs_summary():
+        return
 
-    # 2. Build prompt (recent messages only, no RAG search for now)
-    prompt = build_context_prompt(user_message, recent)
+    logger.info("Generating conversation summary...")
+    context = memory.get_context()
+
+    # Build the text to summarize
+    parts = []
+    if context["summary"]:
+        parts.append(f"Résumé précédent : {context['summary']}")
+    parts.append("Messages à intégrer :")
+    for msg in memory.messages:
+        parts.append(f"[{msg['role']}] {msg['text']}")
+
+    summary_input = "\n".join(parts)
+
+    try:
+        raw_summary = await brain.generate(prompt=summary_input, system=SUMMARY_PROMPT)
+        # The summary response is plain text, not JSON
+        new_summary = raw_summary.strip()
+        # If the LLM wrapped it in JSON anyway, extract the text
+        if new_summary.startswith("{"):
+            try:
+                parsed = json.loads(new_summary)
+                new_summary = parsed.get("text", parsed.get("summary", new_summary))
+            except json.JSONDecodeError:
+                pass
+        memory.update_summary(new_summary)
+    except Exception as e:
+        logger.warning("Failed to generate summary: %s", e)
+
+
+async def process_message(user_message: str) -> dict:
+    """Full pipeline: memory context → LLM call → memory store → return."""
+    # 1. Get conversation context (summary + recent messages)
+    context = memory.get_context()
+
+    # 2. Build prompt with context
+    prompt = build_context_prompt(user_message, context)
 
     # 3. Call the LLM
     raw_response = await brain.generate(prompt=prompt, system=SYSTEM_PROMPT)
@@ -87,7 +134,10 @@ async def process_message(user_message: str) -> dict:
     response = parse_response(raw_response)
 
     # 5. Store user message + aria's response in memory
-    await memory.store(user_message, role="user")
-    await memory.store(response["text"], role="aria")
+    memory.store(user_message, role="user")
+    memory.store(response["text"], role="aria")
+
+    # 6. Generate summary if needed
+    await maybe_summarize()
 
     return response

@@ -1,21 +1,20 @@
 #!/bin/bash
 set -e
 
-# Start Ollama server in background
-ollama serve &
+MODEL_PATH="/models/${MODEL_FILE:-model.gguf}"
 
-# Wait for Ollama to be ready
-echo "Waiting for Ollama to start..."
-until curl -s http://localhost:11434/ > /dev/null 2>&1; do
-    sleep 1
-done
-echo "Ollama is ready."
+if [ ! -f "$MODEL_PATH" ]; then
+    echo "ERROR: Model file not found at $MODEL_PATH"
+    echo "Please download a GGUF model and place it in brain/models/"
+    echo "Example: huggingface-cli download bartowski/gemma-2-2b-it-GGUF --include 'gemma-2-2b-it-Q4_K_M.gguf' --local-dir brain/models/"
+    exit 1
+fi
 
-# Pull the model if not already present
-MODEL="${OLLAMA_MODEL:-gemma3:1b}"
-echo "Pulling model: $MODEL ..."
-ollama pull "$MODEL"
-echo "Model $MODEL is ready."
-
-# Keep the server running
-wait
+echo "Starting llama-server with model: $MODEL_PATH"
+exec llama-server \
+    -m "$MODEL_PATH" \
+    --host 0.0.0.0 \
+    --port 8080 \
+    -ngl "${GPU_LAYERS:-0}" \
+    -c "${CONTEXT_SIZE:-4096}" \
+    --threads "${THREADS:-4}"
