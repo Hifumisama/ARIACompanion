@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Message, ServerMessage } from "../types";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { useAudioRecording } from "../hooks/useAudioRecording";
 import { useAudioPlayback } from "../hooks/useAudioPlayback";
+import { useVAD } from "../hooks/useVAD";
 import { EmotionIndicator } from "./EmotionIndicator";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4545";
@@ -12,6 +13,11 @@ export function Chat() {
   const { recording, transcribing, startRecording, stopRecording } =
     useAudioRecording();
   const { playing, speak, stop: stopAudio } = useAudioPlayback();
+  const handleVADTranscription = useCallback((text: string) => {
+    handleSendRef.current(text);
+  }, []);
+  const { listening, transcribing: vadTranscribing, toggle: toggleVAD } =
+    useVAD({ onTranscription: handleVADTranscription });
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
@@ -20,6 +26,7 @@ export function Chat() {
     emotion: "calm",
   });
   const bottomRef = useRef<HTMLDivElement>(null);
+  const handleSendRef = useRef<(text?: string) => void>(() => {});
 
   useEffect(() => {
     if (!lastMessage) return;
@@ -77,6 +84,7 @@ export function Chat() {
     sendMessage(msg);
     if (!text) setInput("");
   };
+  handleSendRef.current = handleSend;
 
   const handleMicClick = async () => {
     if (recording) {
@@ -116,6 +124,14 @@ export function Chat() {
         </div>
         <div className="header-right">
           <EmotionIndicator emotion={currentEmotion.emotion} />
+          <button
+            className={`vad-btn ${listening ? "active" : ""} ${vadTranscribing ? "transcribing" : ""}`}
+            onClick={toggleVAD}
+            disabled={!connected}
+            title={listening ? "Désactiver le mode mains libres" : "Activer le mode mains libres"}
+          >
+            {vadTranscribing ? "..." : listening ? "AUTO" : "AUTO"}
+          </button>
           <button
             className={`tts-btn ${ttsEnabled ? "active" : ""}`}
             onClick={() => {

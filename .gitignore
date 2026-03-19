@@ -210,6 +210,5 @@ __marimo__/
 node_modules/
 
 # ARIA specific
-models/
 data/
 chroma_data/

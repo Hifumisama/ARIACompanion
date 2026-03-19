@@ -4,21 +4,23 @@ services:
     container_name: aria-brain
     ports:
       - "${BRAIN_PORT:-8080}:8080"
-    environment:
-      - MODEL_FILE=${MODEL_FILE:-model.gguf}
-      - GPU_LAYERS=${GPU_LAYERS:-0}
-      - CONTEXT_SIZE=${CONTEXT_SIZE:-4096}
-      - THREADS=${THREADS:-4}
     volumes:
-      - ./brain/models:/models:ro
-    networks:
-      - aria-net
+      - ./models/llm:/models:ro
+    command: >
+      -m /models/${MODEL_FILE:-model.gguf}
+      --host 0.0.0.0
+      --port 8080
+      -ngl ${GPU_LAYERS:-0}
+      -c ${CONTEXT_SIZE:-4096}
+      --threads ${THREADS:-4}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 60s
+    networks:
+      - aria-net
 
   orchestrator:
     build: ./orchestrator
@@ -28,6 +30,7 @@ services:
     volumes:
       - ./brain/prompts:/prompts:ro
       - ./models/piper:/models/piper:ro
+      - ./models/whisper:/models/whisper:rw
       - aria_memory:/app/data
     environment:
       - BRAIN_URL=http://brain:8080
