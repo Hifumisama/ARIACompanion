@@ -1,12 +1,16 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { DatasetEntry, GenerationConfig } from './types';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { DatasetEntry, GenerationConfig, CharacterDefinition } from './types';
 import { generateBatch } from './services/ollama';
+import { generateSystemPromptFromCharacter } from './services/characterPrompt';
+import { loadAllCharacters, saveCharacter } from './services/storage';
+import { DEFAULT_HADES } from './data/defaultCharacters';
 import { ConfigPanel } from './components/ConfigPanel';
 import { ProgressBar } from './components/ProgressBar';
 import { ResultPanel } from './components/ResultPanel';
 import { AffinagePanel } from './components/AffinagePanel';
+import { CharacterBuilder } from './components/CharacterBuilder';
 
-type Tab = 'config' | 'generation' | 'affinage';
+type Tab = 'character' | 'config' | 'generation' | 'affinage';
 
 interface Toast {
   message: string;
@@ -100,7 +104,39 @@ Tu réponds TOUJOURS en JSON valide:
 };
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<Tab>('config');
+  const [activeTab, setActiveTab] = useState<Tab>('character');
+  const [characters, setCharacters] = useState<CharacterDefinition[]>(() => {
+    const stored = loadAllCharacters();
+    return stored.length > 0 ? stored : [{ ...DEFAULT_HADES, id: crypto.randomUUID(), createdAt: Date.now(), updatedAt: Date.now() }];
+  });
+  const [activeCharacterId, setActiveCharacterId] = useState<string | null>(() => {
+    const stored = loadAllCharacters();
+    return stored.length > 0 ? stored[0].id : null;
+  });
+
+  // Sync activeCharacterId after initial characters are set
+  useEffect(() => {
+    if (!activeCharacterId && characters.length > 0) {
+      setActiveCharacterId(characters[0].id);
+    }
+  }, [characters, activeCharacterId]);
+
+  // Auto-save characters to localStorage on change
+  useEffect(() => {
+    characters.forEach(c => saveCharacter(c));
+  }, [characters]);
+
+  // Derive system prompt from active character
+  const activeCharacter = useMemo(
+    () => characters.find(c => c.id === activeCharacterId) || null,
+    [characters, activeCharacterId]
+  );
+
+  const derivedSystemPrompt = useMemo(
+    () => activeCharacter ? generateSystemPromptFromCharacter(activeCharacter) : DEFAULT_CONFIG.systemPrompt,
+    [activeCharacter]
+  );
+
   const [config, setConfig] = useState<GenerationConfig>(DEFAULT_CONFIG);
   const [entries, setEntries] = useState<DatasetEntry[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -188,7 +224,13 @@ export const App: React.FC = () => {
     abortControllerRef.current?.abort();
   }, []);
 
+  // Sync derived system prompt into config when character changes
+  useEffect(() => {
+    setConfig(prev => ({ ...prev, systemPrompt: derivedSystemPrompt, characterId: activeCharacterId || undefined }));
+  }, [derivedSystemPrompt, activeCharacterId]);
+
   const tabs: { key: Tab; label: string }[] = [
+    { key: 'character', label: `Personnage${activeCharacter ? ` (${activeCharacter.name || '...'})` : ''}` },
     { key: 'config', label: 'Configuration' },
     { key: 'generation', label: `Generation${entries.length > 0 ? ` (${entries.length})` : ''}` },
     { key: 'affinage', label: 'Affinage' }
@@ -216,7 +258,7 @@ export const App: React.FC = () => {
 
       {/* Header */}
       <header style={styles.header}>
-        <h1 style={styles.title}>ARIA Dataset Generator</h1>
+        <h1 style={styles.title}>ARIA Character Builder</h1>
       </header>
 
       {/* Tabs */}
@@ -240,6 +282,17 @@ export const App: React.FC = () => {
 
       {/* Tab Content */}
       <div style={styles.content}>
+        {activeTab === 'character' && (
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <CharacterBuilder
+              characters={characters}
+              activeCharacterId={activeCharacterId}
+              onCharactersChange={setCharacters}
+              onActiveCharacterChange={setActiveCharacterId}
+            />
+          </div>
+        )}
+
         {activeTab === 'config' && (
           <div style={styles.configContent}>
             <ConfigPanel
