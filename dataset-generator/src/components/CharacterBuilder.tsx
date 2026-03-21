@@ -3,6 +3,7 @@ import { CharacterDefinition } from '../types';
 import { generateSystemPromptFromCharacter } from '../services/characterPrompt';
 import { saveCharacter, exportCharacterToJson, importCharacterFromJson } from '../services/storage';
 import { createBlankCharacter, DEFAULT_HADES } from '../data/defaultCharacters';
+import { RadarChart } from './RadarChart';
 
 interface CharacterBuilderProps {
   characters: CharacterDefinition[];
@@ -271,9 +272,22 @@ export const CharacterBuilder: React.FC<CharacterBuilderProps> = ({
         <div style={sectionTitleStyle}>
           Personnalité
           <button style={addBtnStyle} onClick={() => updateChar({ personalityAxes: [...char.personalityAxes, { name: '', value: 50 }] })}>
-            + Ajouter
+            + Ajouter un trait
           </button>
         </div>
+
+        {/* Radar Chart */}
+        {char.personalityAxes.length >= 3 && (
+          <div style={{ marginBottom: 16 }}>
+            <RadarChart
+              axes={char.personalityAxes}
+              onChange={axes => updateChar({ personalityAxes: axes })}
+              size={360}
+            />
+          </div>
+        )}
+
+        {/* Trait list (always visible for editing names + removal) */}
         {char.personalityAxes.map((axis, i) => (
           <div key={i} style={rowStyle}>
             <input
@@ -304,12 +318,18 @@ export const CharacterBuilder: React.FC<CharacterBuilderProps> = ({
             </button>
           </div>
         ))}
+
+        {char.personalityAxes.length > 0 && char.personalityAxes.length < 3 && (
+          <div style={{ color: '#666', fontSize: 12, marginTop: 8 }}>
+            Ajoute encore {3 - char.personalityAxes.length} trait{3 - char.personalityAxes.length > 1 ? 's' : ''} pour afficher le radar.
+          </div>
+        )}
       </div>
 
-      {/* Modes émotionnels */}
+      {/* Modes émotionnels (= tones de l'output) */}
       <div style={sectionStyle}>
         <div style={sectionTitleStyle}>
-          Modes émotionnels
+          Tons / Modes émotionnels
           <button
             style={addBtnStyle}
             onClick={() => updateChar({
@@ -360,6 +380,12 @@ export const CharacterBuilder: React.FC<CharacterBuilderProps> = ({
             </button>
           </div>
         ))}
+        {char.emotionalModes.length > 0 && (
+          <div style={{ color: '#666', fontSize: 12, marginTop: 8, fontStyle: 'italic' }}>
+            Ces modes définissent automatiquement le champ "tone" dans l'output du dataset.
+            Valeurs: [{char.emotionalModes.filter(m => m.name.trim()).map(m => m.name).join(', ')}]
+          </div>
+        )}
       </div>
 
       {/* Déclencheurs */}
@@ -542,6 +568,29 @@ export const CharacterBuilder: React.FC<CharacterBuilderProps> = ({
             + Ajouter
           </button>
         </div>
+
+        {/* Auto-derived tone field */}
+        {char.emotionalModes.length > 0 && (
+          <div style={{
+            padding: 10,
+            background: '#1a2e1a',
+            borderRadius: 6,
+            marginBottom: 8,
+            border: '1px solid #2e5a2e',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}>
+            <span style={{ color: '#4CAF50', fontWeight: 600, fontSize: 13 }}>tone</span>
+            <span style={{ color: '#888', fontSize: 12 }}>
+              enum [{char.emotionalModes.filter(m => m.name.trim()).map(m => m.name).join(', ')}]
+            </span>
+            <span style={{ color: '#666', fontSize: 11, marginLeft: 'auto', fontStyle: 'italic' }}>
+              auto (depuis les modes)
+            </span>
+          </div>
+        )}
+
         {char.outputFields.map((field, i) => (
           <div key={i} style={{ padding: 10, background: '#252525', borderRadius: 6, marginBottom: 8, border: '1px solid #383838' }}>
             <div style={rowStyle}>

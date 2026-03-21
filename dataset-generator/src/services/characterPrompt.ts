@@ -75,10 +75,42 @@ export function generateSystemPromptFromCharacter(char: CharacterDefinition): st
     sections.push(`## Relations\n${rels}`);
   }
 
-  // Format de réponse
-  sections.push(`## Format de réponse\nTu réponds TOUJOURS en JSON valide avec la structure suivante dans "output":\n${buildOutputFormatDescription(char.outputFields)}`);
+  // Format de réponse — combine auto-derived tone + custom output fields
+  const allFields = getAllOutputFields(char);
+  sections.push(`## Format de réponse\nTu réponds TOUJOURS en JSON valide avec la structure suivante dans "output":\n${buildOutputFormatDescription(allFields)}`);
 
   return sections.join('\n\n');
+}
+
+/**
+ * Retourne tous les output fields, incluant le champ "tone" auto-dérivé des modes émotionnels.
+ */
+export function getAllOutputFields(char: CharacterDefinition): OutputFieldDefinition[] {
+  const fields: OutputFieldDefinition[] = [];
+
+  // Auto-derive tone from emotional modes
+  const modeNames = char.emotionalModes
+    .map(m => m.name.trim())
+    .filter(Boolean);
+
+  if (modeNames.length > 0) {
+    fields.push({
+      name: 'tone',
+      type: 'enum',
+      enumValues: modeNames,
+      description: 'Le ton émotionnel de la réponse',
+      required: true,
+    });
+  }
+
+  // Add user-defined output fields (excluding any manual "tone" to avoid duplicates)
+  for (const f of char.outputFields) {
+    if (f.name.toLowerCase() !== 'tone') {
+      fields.push(f);
+    }
+  }
+
+  return fields;
 }
 
 /**
