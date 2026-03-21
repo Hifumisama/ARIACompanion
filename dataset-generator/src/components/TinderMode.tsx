@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { AffinageEntry } from '../types';
+import { AffinageEntry, OutputFieldDefinition } from '../types';
 
 interface TinderModeProps {
   entries: AffinageEntry[];
+  outputFields: OutputFieldDefinition[];
   onExit: () => void;
   onDownloadLiked: (liked: AffinageEntry[]) => void;
   onRegenerateDisliked: (disliked: AffinageEntry[]) => void;
@@ -10,6 +11,7 @@ interface TinderModeProps {
 
 export const TinderMode: React.FC<TinderModeProps> = ({
   entries,
+  outputFields,
   onExit,
   onDownloadLiked,
   onRegenerateDisliked
@@ -118,7 +120,7 @@ export const TinderMode: React.FC<TinderModeProps> = ({
               >
                 <div style={styles.cardHeader}>
                   <span style={styles.cardId}>#{currentEntry.id}</span>
-                  <span style={styles.cardTone}>{currentEntry.output.tone}</span>
+                  {currentEntry.output.tone && <span style={styles.cardTone}>{currentEntry.output.tone}</span>}
                   {currentEntry.judgeScore !== undefined && (
                     <span style={{
                       ...styles.cardScore,
@@ -133,9 +135,14 @@ export const TinderMode: React.FC<TinderModeProps> = ({
                 <CardField label="Context" value={currentEntry.context} />
                 <CardField label="Instruction" value={currentEntry.instruction} />
                 <CardField label="Input" value={currentEntry.input} />
-                <CardField label="Tone" value={currentEntry.output.tone} />
-                <CardField label="Action" value={currentEntry.output.action} />
-                <CardField label="Text" value={currentEntry.output.text} />
+                {outputFields.length > 0
+                  ? outputFields.map(f => (
+                      <CardField key={f.name} label={f.name} value={currentEntry.output[f.name] || ''} />
+                    ))
+                  : Object.entries(currentEntry.output).map(([key, val]) => (
+                      <CardField key={key} label={key} value={val} />
+                    ))
+                }
                 {currentEntry.judgeComment && (
                   <CardField label="Commentaire du juge" value={currentEntry.judgeComment} />
                 )}
@@ -275,9 +282,14 @@ const SideList: React.FC<SideListProps> = ({
                   <CardField label="Context" value={entry.context} />
                   <CardField label="Instruction" value={entry.instruction} />
                   <CardField label="Input" value={entry.input} />
-                  <CardField label="Tone" value={entry.output.tone} />
-                  <CardField label="Action" value={entry.output.action} />
-                  <CardField label="Text" value={entry.output.text} />
+                  {outputFields.length > 0
+                    ? outputFields.map(f => (
+                        <CardField key={f.name} label={f.name} value={entry.output[f.name] || ''} />
+                      ))
+                    : Object.entries(entry.output).map(([key, val]) => (
+                        <CardField key={key} label={key} value={val} />
+                      ))
+                  }
                   <button
                     onClick={() => onMoveToOpposite(entry)}
                     style={{ ...styles.moveBtn, backgroundColor: moveColor }}

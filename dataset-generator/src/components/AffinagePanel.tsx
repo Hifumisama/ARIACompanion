@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { DatasetEntry, AffinageEntry } from '../types';
+import { DatasetEntry, AffinageEntry, OutputFieldDefinition } from '../types';
 import { fetchAvailableModels, judgeEntry, regenerateEntry, generateJudgePrompt } from '../services/ollama';
 import { TinderMode } from './TinderMode';
 
 interface AffinagePanelProps {
   entries: DatasetEntry[];
   systemPrompt: string;
+  outputFields: OutputFieldDefinition[];
   onEntriesUpdate: (entries: DatasetEntry[]) => void;
 }
 
@@ -56,6 +57,7 @@ function playNotificationSound(success: boolean) {
 export const AffinagePanel: React.FC<AffinagePanelProps> = ({
   entries,
   systemPrompt,
+  outputFields,
   onEntriesUpdate
 }) => {
   const [affinageEntries, setAffinageEntries] = useState<AffinageEntry[]>([]);
@@ -322,6 +324,7 @@ export const AffinagePanel: React.FC<AffinagePanelProps> = ({
           modalModel,
           usedPrompt,
           useComments,
+          outputFields,
           abortRef.current.signal
         );
         updated[idx] = { ...newEntry, judgeScore: undefined, judgeComment: undefined };
@@ -409,6 +412,7 @@ export const AffinagePanel: React.FC<AffinagePanelProps> = ({
         </div>
         <TinderMode
           entries={affinageEntries}
+          outputFields={outputFields}
           onExit={() => setTinderMode(false)}
           onDownloadLiked={handleTinderDownloadLiked}
           onRegenerateDisliked={handleTinderRegenerateDisliked}
@@ -612,18 +616,15 @@ export const AffinagePanel: React.FC<AffinagePanelProps> = ({
                             </div>
                             <div style={styles.sidePanel}>
                               <h4 style={styles.sidePanelTitle}>Output</h4>
-                              <div style={styles.fieldBlock}>
-                                <span style={styles.fieldLabel}>Tone</span>
-                                <p style={styles.fieldValue}>{entry.output.tone}</p>
-                              </div>
-                              <div style={styles.fieldBlock}>
-                                <span style={styles.fieldLabel}>Action</span>
-                                <p style={styles.fieldValue}>{entry.output.action}</p>
-                              </div>
-                              <div style={styles.fieldBlock}>
-                                <span style={styles.fieldLabel}>Text</span>
-                                <p style={styles.fieldValue}>{entry.output.text}</p>
-                              </div>
+                              {(outputFields.length > 0
+                                ? outputFields.map(f => [f.name, entry.output[f.name] || ''] as const)
+                                : Object.entries(entry.output)
+                              ).map(([key, val]) => (
+                                <div key={key} style={styles.fieldBlock}>
+                                  <span style={styles.fieldLabel}>{key}</span>
+                                  <p style={styles.fieldValue}>{val}</p>
+                                </div>
+                              ))}
                             </div>
                           </div>
                           {entry.judgeComment && (
@@ -688,43 +689,34 @@ export const AffinagePanel: React.FC<AffinagePanelProps> = ({
                   onChange={e => setEditEntry({ ...editEntry, input: e.target.value })}
                 />
               </div>
-              <div style={styles.formGroup}>
-                <label style={styles.smallLabel}>Tone</label>
-                <select
-                  style={styles.modalInput}
-                  value={editEntry.output.tone}
-                  onChange={e => setEditEntry({
-                    ...editEntry,
-                    output: { ...editEntry.output, tone: e.target.value as any }
-                  })}
-                >
-                  {['sarcastic', 'scheming', 'annoyed', 'amused', 'furious', 'calm'].map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.smallLabel}>Action</label>
-                <textarea
-                  style={{ ...styles.modalInput, height: '60px', resize: 'vertical' }}
-                  value={editEntry.output.action}
-                  onChange={e => setEditEntry({
-                    ...editEntry,
-                    output: { ...editEntry.output, action: e.target.value }
-                  })}
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.smallLabel}>Text</label>
-                <textarea
-                  style={{ ...styles.modalInput, height: '80px', resize: 'vertical' }}
-                  value={editEntry.output.text}
-                  onChange={e => setEditEntry({
-                    ...editEntry,
-                    output: { ...editEntry.output, text: e.target.value }
-                  })}
-                />
-              </div>
+              {(outputFields.length > 0 ? outputFields : Object.keys(editEntry.output).map(k => ({ name: k, type: 'string' as const, description: '', required: true } as OutputFieldDefinition))).map(field => (
+                <div key={field.name} style={styles.formGroup}>
+                  <label style={styles.smallLabel}>{field.name}</label>
+                  {field.type === 'enum' && field.enumValues?.length ? (
+                    <select
+                      style={styles.modalInput}
+                      value={editEntry.output[field.name] || ''}
+                      onChange={e => setEditEntry({
+                        ...editEntry,
+                        output: { ...editEntry.output, [field.name]: e.target.value }
+                      })}
+                    >
+                      {field.enumValues.map(v => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <textarea
+                      style={{ ...styles.modalInput, height: field.name === 'text' ? '80px' : '60px', resize: 'vertical' }}
+                      value={editEntry.output[field.name] || ''}
+                      onChange={e => setEditEntry({
+                        ...editEntry,
+                        output: { ...editEntry.output, [field.name]: e.target.value }
+                      })}
+                    />
+                  )}
+                </div>
+              ))}
             </div>
             <div style={styles.modalFooter}>
               <button onClick={() => setModalType(null)} style={styles.btnSecondary}>Annuler</button>

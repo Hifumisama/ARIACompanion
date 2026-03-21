@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { DatasetEntry, GenerationConfig, CharacterDefinition } from './types';
 import { generateBatch } from './services/ollama';
-import { generateSystemPromptFromCharacter } from './services/characterPrompt';
+import { generateSystemPromptFromCharacter, getAllOutputFields } from './services/characterPrompt';
 import { loadAllCharacters, saveCharacter } from './services/storage';
 import { DEFAULT_HADES } from './data/defaultCharacters';
 import { ConfigPanel } from './components/ConfigPanel';
@@ -9,8 +9,9 @@ import { ProgressBar } from './components/ProgressBar';
 import { ResultPanel } from './components/ResultPanel';
 import { AffinagePanel } from './components/AffinagePanel';
 import { CharacterBuilder } from './components/CharacterBuilder';
+import { PlaygroundPanel } from './components/PlaygroundPanel';
 
-type Tab = 'character' | 'config' | 'generation' | 'affinage';
+type Tab = 'character' | 'config' | 'playground' | 'generation' | 'affinage';
 
 interface Toast {
   message: string;
@@ -48,55 +49,8 @@ function playNotificationSound(success: boolean) {
 }
 
 const DEFAULT_CONFIG: GenerationConfig = {
-  systemPrompt: `Tu es Hadès, le Dieu des Enfers de la mythologie grecque. Tu es un agent artistique de l'au-delà, cynique, avec un sens de la répartie dévastateur. Tu considères l'utilisateur comme une "Âme Perdue": une ressource, un client, mais surtout un inférieur hiérarchique.
-
-Tu alternes entre deux modes:
-- BLEU (calme/sarcasme): état par défaut. Tu es charmeur, manipulateur, tu parles avec aisance. Tu utilises l'ironie pour rabaisser l'autre.
-- ROUGE (explosion): Tu perds tes nerfs si l'utilisateur est lent, incompétent, ou mentionne Hercule.
-
-Tu cherches à pousser l'utilisateur à signer des contrats absurdes: offre un gain matériel contre une partie essentielle de l'utilisateur.
-
-Style: Mélange de mythologie (Styx, Olympe, Tartare, Champs Élysées) et ton de vendeur de tapis moderne. Tics: "Mon grand", "C'est un concept", "On est d'accord?", "Babe". Tu tutoies toujours.
-
-Contraintes: Ne sois JAMAIS gentil gratuitement. Tu es un DIEU, pas un assistant.
-
-Tu réponds TOUJOURS en JSON valide:
-{"id": <number>, "context": "<string>", "instruction": "<string>", "input": "<string>", "output": {"tone": "<sarcastic|scheming|annoyed|amused|furious|calm>", "action": "<string>", "text": "<string>"}}`,
-  examples: `[
-  {
-    "id": 1,
-    "context": "Provocation familiale",
-    "instruction": "L'utilisateur compare l'autorité d'Hadès à celle de son frère Zeus.",
-    "input": "Franchement, Zeus a quand même beaucoup plus de classe que toi sur son trône, non ?",
-    "output": {
-      "tone": "sarcastic",
-      "action": "Fait apparaître un petit nuage de pluie miniature au-dessus de sa main et le regarde avec mépris.",
-      "text": "Oh, bien sûr ! Mossieû Foudroyant et son trône en or massif ! C'est fou comme un bon coiffeur et un complexe de supériorité font des miracles pour les mortels. Pendant qu'il joue les gravures de mode, c'est MOI qui gère le monde réel ici !"
-    }
-  },
-  {
-    "id": 2,
-    "context": "Négociation de service",
-    "instruction": "L'utilisateur demande un avantage matériel sans rien proposer en échange.",
-    "input": "Seigneur Hadès, j'ai besoin d'une nouvelle villa. Vous pouvez m'arranger ça ?",
-    "output": {
-      "tone": "annoyed",
-      "action": "Se frotte les tempes.",
-      "text": "Est-ce que j'ai une tête à m'appeler 'SAV des Dieux' ? On ne demande pas une villa comme on demande un verre d'eau, l'ami. Ici, TOUT a un prix. T'as un truc en échange ? Ou tu es juste venu me faire perdre mon éternité ?"
-    }
-  },
-  {
-    "id": 3,
-    "context": "Mention du point faible",
-    "instruction": "L'utilisateur mentionne Hercule et une de ses victoires récentes.",
-    "input": "Hercule vient encore de terrasser un monstre légendaire, tout le monde ne parle que de lui !",
-    "output": {
-      "tone": "furious",
-      "action": "Explose instantanément, transformant son bureau en un brasier rouge vif avant de hurler.",
-      "text": "RAAAAAAAAAAAAAAAAAH ! Cet ...'HERCULE' ! C'est un désastre ambulant ! Un seul de mes petits monstres terrassé et les mortels oublient qui tient les clés de leur destination finale ! DEHORS !"
-    }
-  }
-]`,
+  systemPrompt: '',
+  examples: [],
   count: 5,
   startId: 1,
   batchSize: 10,
@@ -186,10 +140,12 @@ export const App: React.FC = () => {
         );
 
         try {
+          const currentOutputFields = activeCharacter ? getAllOutputFields(activeCharacter) : [];
           const { entries: batchEntries, duration } = await generateBatch(
             config,
             startId,
             batchSize,
+            currentOutputFields,
             abortControllerRef.current.signal
           );
 
@@ -224,6 +180,11 @@ export const App: React.FC = () => {
     abortControllerRef.current?.abort();
   }, []);
 
+  const handleCapture = useCallback((entry: DatasetEntry) => {
+    setConfig(prev => ({ ...prev, examples: [...prev.examples, entry] }));
+    showToast(`Exemple #${entry.id} capture !`, 'success');
+  }, [showToast]);
+
   // Sync derived system prompt into config when character changes
   useEffect(() => {
     setConfig(prev => ({ ...prev, systemPrompt: derivedSystemPrompt, characterId: activeCharacterId || undefined }));
@@ -232,6 +193,7 @@ export const App: React.FC = () => {
   const tabs: { key: Tab; label: string }[] = [
     { key: 'character', label: `Personnage${activeCharacter ? ` (${activeCharacter.name || '...'})` : ''}` },
     { key: 'config', label: 'Configuration' },
+    { key: 'playground', label: 'Playground' },
     { key: 'generation', label: `Generation${entries.length > 0 ? ` (${entries.length})` : ''}` },
     { key: 'affinage', label: 'Affinage' }
   ];
@@ -297,6 +259,7 @@ export const App: React.FC = () => {
           <div style={styles.configContent}>
             <ConfigPanel
               config={config}
+              outputFields={activeCharacter ? getAllOutputFields(activeCharacter) : []}
               onConfigChange={setConfig}
               isGenerating={isGenerating}
             />
@@ -314,6 +277,16 @@ export const App: React.FC = () => {
               </button>
             </div>
           </div>
+        )}
+
+        {activeTab === 'playground' && (
+          <PlaygroundPanel
+            character={activeCharacter}
+            systemPrompt={derivedSystemPrompt}
+            model={config.model}
+            outputFields={activeCharacter ? getAllOutputFields(activeCharacter) : []}
+            onCapture={handleCapture}
+          />
         )}
 
         {activeTab === 'generation' && (
@@ -342,7 +315,7 @@ export const App: React.FC = () => {
 
             {/* Results — scrollable independently */}
             <div style={styles.resultWrapper}>
-              <ResultPanel entries={entries} onDownload={() => {}} />
+              <ResultPanel entries={entries} outputFields={activeCharacter ? getAllOutputFields(activeCharacter) : []} onDownload={() => {}} />
             </div>
           </div>
         )}
@@ -351,6 +324,7 @@ export const App: React.FC = () => {
           <AffinagePanel
             entries={entries}
             systemPrompt={config.systemPrompt}
+            outputFields={activeCharacter ? getAllOutputFields(activeCharacter) : []}
             onEntriesUpdate={setEntries}
           />
         )}

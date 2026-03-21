@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { DatasetEntry } from '../types';
+import { DatasetEntry, OutputFieldDefinition } from '../types';
 
 const ITEMS_PER_PAGE = 20;
 
 interface ResultPanelProps {
   entries: DatasetEntry[];
+  outputFields: OutputFieldDefinition[];
   onDownload: () => void;
 }
 
-export const ResultPanel: React.FC<ResultPanelProps> = ({ entries }) => {
+export const ResultPanel: React.FC<ResultPanelProps> = ({ entries, outputFields }) => {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [showRawJson, setShowRawJson] = useState(false);
   const [page, setPage] = useState(0);
@@ -88,7 +89,9 @@ export const ResultPanel: React.FC<ResultPanelProps> = ({ entries }) => {
                     <span style={styles.arrow}>{isExpanded ? '▼' : '▶'}</span>
                     <span style={styles.id}>#{entry.id}</span>
                     <span style={styles.context}>{entry.context}</span>
-                    <span style={styles.tone}>{entry.output.tone}</span>
+                    {entry.output.tone && (
+                      <span style={styles.tone}>{entry.output.tone}</span>
+                    )}
                   </button>
 
                   {isExpanded && (
@@ -96,9 +99,14 @@ export const ResultPanel: React.FC<ResultPanelProps> = ({ entries }) => {
                       <Field label="Context" value={entry.context} />
                       <Field label="Instruction" value={entry.instruction} />
                       <Field label="Input" value={entry.input} />
-                      <Field label="Tone" value={entry.output.tone} />
-                      <Field label="Action" value={entry.output.action} />
-                      <Field label="Text" value={entry.output.text} last />
+                      {outputFields.length > 0
+                        ? outputFields.map((f, idx) => (
+                            <Field key={f.name} label={f.name} value={entry.output[f.name] || ''} last={idx === outputFields.length - 1} />
+                          ))
+                        : Object.entries(entry.output).map(([key, val], idx, arr) => (
+                            <Field key={key} label={key} value={val} last={idx === arr.length - 1} />
+                          ))
+                      }
                     </div>
                   )}
                 </div>

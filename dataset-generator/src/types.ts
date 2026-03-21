@@ -76,7 +76,7 @@ export interface DatasetEntry {
 export interface GenerationConfig {
   characterId?: string;
   systemPrompt: string;
-  examples: string;
+  examples: DatasetEntry[];
   count: number;
   startId: number;
   model: string;
