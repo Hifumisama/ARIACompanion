@@ -3,7 +3,9 @@
     "allow": [
       "Bash(grep -r \"menacing\\\\|theatrical\" . --include=\"*.py\" --include=\"*.ts\" --include=\"*.tsx\" --include=\"*.txt\" 2>/dev/null | grep -v node_modules | grep -v \".git\")",
       "Bash(grep -r \"calm\\\\|amused\\\\|annoyed\\\\|sarcastic\\\\|furious\\\\|scheming\" . --include=\"*.py\" --include=\"*.ts\" --include=\"*.tsx\" --include=\"*.txt\" 2>/dev/null | grep -v node_modules | grep -v \".git\" | wc -l)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "WebSearch",
+      "Bash(npm install:*)"
     ]
   }
 }

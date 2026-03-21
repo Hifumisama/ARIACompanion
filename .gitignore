@@ -212,3 +212,13 @@ node_modules/
 # ARIA specific
 data/
 chroma_data/
+
+models
+models/*
+
+# Models (downloaded via download_models.py)
+models/llm/*.gguf
+models/whisper/models--*
+models/whisper/.locks/
+models/piper/*.onnx
+models/piper/*.onnx.json

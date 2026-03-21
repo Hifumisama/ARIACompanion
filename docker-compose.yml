@@ -1,4 +1,16 @@
 services:
+  model-init:
+    build: ./init
+    container_name: aria-model-init
+    volumes:
+      - ./models/llm:/models/llm
+    environment:
+      - MODEL_FILE=${MODEL_FILE:-hades-v1.gguf}
+      - LLM_REPO_ID=${LLM_REPO_ID:-Hifumisama/hades-finetune-llm-gguf}
+      - HF_TOKEN=${HF_TOKEN:-}
+    networks:
+      - aria-net
+
   brain:
     build: ./brain
     container_name: aria-brain
@@ -7,7 +19,7 @@ services:
     volumes:
       - ./models/llm:/models:ro
     command: >
-      -m /models/${MODEL_FILE:-model.gguf}
+      -m /models/${MODEL_FILE:-hades-v1.gguf}
       --host 0.0.0.0
       --port 8080
       -ngl ${GPU_LAYERS:-0}
@@ -19,6 +31,9 @@ services:
       timeout: 5s
       retries: 10
       start_period: 60s
+    depends_on:
+      model-init:
+        condition: service_completed_successfully
     networks:
       - aria-net
 
