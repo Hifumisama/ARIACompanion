@@ -11,7 +11,9 @@ import { AffinagePanel } from './components/AffinagePanel';
 import { CharacterBuilder } from './components/CharacterBuilder';
 import { PlaygroundPanel } from './components/PlaygroundPanel';
 
-type Tab = 'character' | 'config' | 'playground' | 'generation' | 'affinage';
+type Tab = 'character' | 'playground' | 'generation' | 'affinage';
+
+const TAB_ORDER: Tab[] = ['character', 'playground', 'generation', 'affinage'];
 
 interface Toast {
   message: string;
@@ -68,19 +70,16 @@ export const App: React.FC = () => {
     return stored.length > 0 ? stored[0].id : null;
   });
 
-  // Sync activeCharacterId after initial characters are set
   useEffect(() => {
     if (!activeCharacterId && characters.length > 0) {
       setActiveCharacterId(characters[0].id);
     }
   }, [characters, activeCharacterId]);
 
-  // Auto-save characters to localStorage on change
   useEffect(() => {
     characters.forEach(c => saveCharacter(c));
   }, [characters]);
 
-  // Derive system prompt from active character
   const activeCharacter = useMemo(
     () => characters.find(c => c.id === activeCharacterId) || null,
     [characters, activeCharacterId]
@@ -185,14 +184,19 @@ export const App: React.FC = () => {
     showToast(`Exemple #${entry.id} capture !`, 'success');
   }, [showToast]);
 
-  // Sync derived system prompt into config when character changes
   useEffect(() => {
     setConfig(prev => ({ ...prev, systemPrompt: derivedSystemPrompt, characterId: activeCharacterId || undefined }));
   }, [derivedSystemPrompt, activeCharacterId]);
 
+  // Navigation
+  const nextTab = () => {
+    const idx = TAB_ORDER.indexOf(activeTab);
+    if (idx < TAB_ORDER.length - 1) setActiveTab(TAB_ORDER[idx + 1]);
+  };
+  const hasNextTab = TAB_ORDER.indexOf(activeTab) < TAB_ORDER.length - 1;
+
   const tabs: { key: Tab; label: string }[] = [
     { key: 'character', label: `Personnage${activeCharacter ? ` (${activeCharacter.name || '...'})` : ''}` },
-    { key: 'config', label: 'Configuration' },
     { key: 'playground', label: 'Playground' },
     { key: 'generation', label: `Generation${entries.length > 0 ? ` (${entries.length})` : ''}` },
     { key: 'affinage', label: 'Affinage' }
@@ -245,7 +249,7 @@ export const App: React.FC = () => {
       {/* Tab Content */}
       <div style={styles.content}>
         {activeTab === 'character' && (
-          <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 60 }}>
             <CharacterBuilder
               characters={characters}
               activeCharacterId={activeCharacterId}
@@ -255,80 +259,105 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'config' && (
-          <div style={styles.configContent}>
-            <ConfigPanel
-              config={config}
+        {activeTab === 'playground' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 60 }}>
+            <PlaygroundPanel
+              character={activeCharacter}
+              systemPrompt={derivedSystemPrompt}
+              model={config.model}
               outputFields={activeCharacter ? getAllOutputFields(activeCharacter) : []}
-              onConfigChange={setConfig}
-              isGenerating={isGenerating}
+              onCapture={handleCapture}
             />
-            {/* Generate button at bottom of config */}
-            <div style={styles.generateSection}>
-              <button
-                onClick={() => { handleGenerate(); setActiveTab('generation'); }}
-                style={styles.generateButton}
-                disabled={isGenerating}
-              >
-                Generer {config.count} entree{config.count > 1 ? 's' : ''}
-                <span style={styles.buttonSub}>
-                  ({Math.ceil(config.count / config.batchSize)} batch{Math.ceil(config.count / config.batchSize) > 1 ? 'es' : ''} de {config.batchSize})
-                </span>
-              </button>
-            </div>
           </div>
         )}
 
-        {activeTab === 'playground' && (
-          <PlaygroundPanel
-            character={activeCharacter}
-            systemPrompt={derivedSystemPrompt}
-            model={config.model}
-            outputFields={activeCharacter ? getAllOutputFields(activeCharacter) : []}
-            onCapture={handleCapture}
-          />
-        )}
-
         {activeTab === 'generation' && (
-          <div style={styles.generationContent}>
-            {/* Progress + Cancel */}
-            {(isGenerating || entries.length > 0) && (
-              <div style={styles.progressSection}>
-                <ProgressBar
-                  current={progress}
-                  total={config.count}
-                  currentBatch={currentBatch}
-                  totalBatches={totalBatches}
-                  averageBatchTime={averageBatchTime}
-                  estimatedTimeRemaining={estimatedTimeRemaining}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: 70 }}>
+            {/* Config section — scrollable */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+              <div style={{ maxWidth: 900 }}>
+                <ConfigPanel
+                  config={config}
+                  outputFields={activeCharacter ? getAllOutputFields(activeCharacter) : []}
+                  character={activeCharacter}
+                  onConfigChange={setConfig}
+                  isGenerating={isGenerating}
                 />
-                {isGenerating && (
-                  <button onClick={handleCancel} style={styles.cancelButton}>
-                    Annuler
-                  </button>
-                )}
               </div>
-            )}
 
-            {/* Error */}
-            {error && <div style={styles.errorBox}>{error}</div>}
+              {/* Error */}
+              {error && <div style={{ ...styles.errorBox, marginTop: 16, maxWidth: 900 }}>{error}</div>}
 
-            {/* Results — scrollable independently */}
-            <div style={styles.resultWrapper}>
-              <ResultPanel entries={entries} outputFields={activeCharacter ? getAllOutputFields(activeCharacter) : []} onDownload={() => {}} />
+              {/* Results */}
+              {entries.length > 0 && (
+                <div style={{ marginTop: 24, maxWidth: 900 }}>
+                  <h3 style={{ color: '#4CAF50', fontSize: 16, marginBottom: 12 }}>
+                    Resultats ({entries.length})
+                  </h3>
+                  <ResultPanel entries={entries} outputFields={activeCharacter ? getAllOutputFields(activeCharacter) : []} batchSize={config.batchSize} onDownload={() => {}} />
+                </div>
+              )}
+            </div>
+
+            {/* Fixed bottom bar */}
+            <div style={styles.bottomBar}>
+              {isGenerating && (
+                <div style={{ flex: 1, marginRight: 12 }}>
+                  <ProgressBar
+                    current={progress}
+                    total={config.count}
+                    currentBatch={currentBatch}
+                    totalBatches={totalBatches}
+                    averageBatchTime={averageBatchTime}
+                    estimatedTimeRemaining={estimatedTimeRemaining}
+                  />
+                </div>
+              )}
+              {isGenerating ? (
+                <button onClick={handleCancel} style={styles.cancelButton}>
+                  Annuler
+                </button>
+              ) : (
+                <button
+                  onClick={handleGenerate}
+                  style={styles.generateButton}
+                  disabled={!config.model}
+                >
+                  Generer {config.count} entree{config.count > 1 ? 's' : ''}
+                  <span style={styles.buttonSub}>
+                    ({Math.ceil(config.count / config.batchSize)} batch{Math.ceil(config.count / config.batchSize) > 1 ? 'es' : ''})
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         )}
 
         {activeTab === 'affinage' && (
-          <AffinagePanel
-            entries={entries}
-            systemPrompt={config.systemPrompt}
-            outputFields={activeCharacter ? getAllOutputFields(activeCharacter) : []}
-            onEntriesUpdate={setEntries}
-          />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 60 }}>
+            <AffinagePanel
+              entries={entries}
+              systemPrompt={config.systemPrompt}
+              outputFields={activeCharacter ? getAllOutputFields(activeCharacter) : []}
+              character={activeCharacter}
+              onEntriesUpdate={setEntries}
+            />
+          </div>
         )}
       </div>
+
+      {/* Fixed "Next" button — shown on all tabs except last and except generation (which has its own bar) */}
+      {hasNextTab && activeTab !== 'generation' && (
+        <button
+          onClick={nextTab}
+          style={styles.nextButton}
+        >
+          {TAB_ORDER[TAB_ORDER.indexOf(activeTab) + 1] === 'playground' ? 'Playground' :
+           TAB_ORDER[TAB_ORDER.indexOf(activeTab) + 1] === 'generation' ? 'Generation' :
+           TAB_ORDER[TAB_ORDER.indexOf(activeTab) + 1] === 'affinage' ? 'Affinage' : 'Suivant'}
+          {' \u2192'}
+        </button>
+      )}
     </div>
   );
 };
@@ -388,67 +417,52 @@ const styles = {
   content: {
     flex: 1,
     overflow: 'hidden',
-    display: 'flex'
-  } as React.CSSProperties,
-  configContent: {
-    flex: 1,
-    padding: '24px',
-    overflowY: 'auto',
-    maxWidth: '800px'
-  } as React.CSSProperties,
-  generationContent: {
-    flex: 1,
-    padding: '24px',
     display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
-    overflow: 'hidden'
+    position: 'relative',
   } as React.CSSProperties,
-  generateSection: {
-    marginTop: '24px',
-    paddingTop: '16px',
-    borderTop: '1px solid #333'
-  } as React.CSSProperties,
-  progressSection: {
-    flexShrink: 0,
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: '12px 24px',
+    backgroundColor: '#0d0d0d',
+    borderTop: '1px solid #333',
     display: 'flex',
-    alignItems: 'flex-start',
-    gap: '12px'
-  } as React.CSSProperties,
-  resultWrapper: {
-    flex: 1,
-    minHeight: 0,
-    overflowY: 'auto'
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: '12px',
+    zIndex: 10,
   } as React.CSSProperties,
   generateButton: {
-    padding: '14px 28px',
+    padding: '12px 24px',
     backgroundColor: '#4CAF50',
     color: 'white',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
-    fontSize: '16px',
+    fontSize: '15px',
     fontWeight: 'bold',
     display: 'flex',
     alignItems: 'center',
-    gap: '10px'
+    gap: '8px',
+    whiteSpace: 'nowrap',
   } as React.CSSProperties,
   buttonSub: {
-    fontSize: '12px',
+    fontSize: '11px',
     opacity: 0.8,
     fontWeight: 'normal'
   } as React.CSSProperties,
   cancelButton: {
-    padding: '10px 20px',
+    padding: '12px 24px',
     backgroundColor: '#f44336',
     color: 'white',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
-    fontSize: '13px',
+    fontSize: '14px',
     fontWeight: 'bold',
     whiteSpace: 'nowrap',
-    flexShrink: 0
   } as React.CSSProperties,
   errorBox: {
     padding: '12px',
@@ -456,13 +470,21 @@ const styles = {
     color: 'white',
     borderRadius: '4px',
     fontSize: '14px',
-    flexShrink: 0
   } as React.CSSProperties,
-  affinageContent: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
+  nextButton: {
+    position: 'fixed',
+    bottom: '20px',
+    right: '24px',
+    padding: '10px 20px',
+    backgroundColor: '#1b5e20',
+    border: '1px solid #4CAF50',
+    borderRadius: '8px',
+    color: '#4CAF50',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    zIndex: 100,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
   } as React.CSSProperties,
   toastContainer: {
     position: 'fixed',

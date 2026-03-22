@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { GenerationConfig, DatasetEntry, OutputFieldDefinition } from '../types';
-import { fetchAvailableModels } from '../services/ollama';
-import { validateOutput } from '../services/characterPrompt';
+import { GenerationConfig, DatasetEntry, OutputFieldDefinition, CharacterDefinition } from '../types';
+import { fetchAvailableModels, generateScenarios } from '../services/ollama';
 
 interface ConfigPanelProps {
   config: GenerationConfig;
   outputFields: OutputFieldDefinition[];
+  character: CharacterDefinition | null;
   onConfigChange: (config: GenerationConfig) => void;
   isGenerating: boolean;
 }
@@ -13,12 +13,15 @@ interface ConfigPanelProps {
 export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   config,
   outputFields,
+  character,
   onConfigChange,
   isGenerating
 }) => {
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedExampleId, setExpandedExampleId] = useState<number | null>(null);
+  const [generatingScenarios, setGeneratingScenarios] = useState(false);
+  const [editingExample, setEditingExample] = useState<DatasetEntry | null>(null);
 
   useEffect(() => {
     fetchAvailableModels().then(m => {
@@ -55,7 +58,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
           }));
 
         if (valid.length === 0) {
-          alert('Aucune entrée valide trouvée dans le fichier.');
+          alert('Aucune entree valide trouvee dans le fichier.');
           return;
         }
 
@@ -91,6 +94,39 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
     onConfigChange({ ...config, examples: [] });
   };
 
+  const handleSaveEdit = () => {
+    if (!editingExample) return;
+    onConfigChange({
+      ...config,
+      examples: config.examples.map(e => e.id === editingExample.id ? editingExample : e)
+    });
+    setEditingExample(null);
+  };
+
+  const handleGenerateScenarios = async () => {
+    if (!character || !config.model) return;
+    setGeneratingScenarios(true);
+    try {
+      const scenarios = await generateScenarios(character, config.model, 5);
+      if (scenarios.length === 0) {
+        alert('Aucun scenario genere. Reessaye.');
+        return;
+      }
+      const newEntries: DatasetEntry[] = scenarios.map((s, i) => ({
+        id: config.examples.length + i + 1,
+        context: s.context,
+        instruction: s.instruction,
+        input: s.input,
+        output: {},
+      }));
+      onConfigChange({ ...config, examples: [...config.examples, ...newEntries] });
+    } catch (err) {
+      alert(`Erreur: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+    } finally {
+      setGeneratingScenarios(false);
+    }
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.formGroup}>
@@ -118,10 +154,10 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
           onChange={(e) => onConfigChange({ ...config, systemPrompt: e.target.value })}
           disabled={isGenerating}
           style={{ ...styles.input, ...styles.textarea, height: '160px' }}
-          placeholder="Généré automatiquement depuis la fiche personnage..."
+          placeholder="Genere automatiquement depuis la fiche personnage..."
         />
         <span style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
-          Ce prompt est généré depuis l'onglet Personnage. Tu peux le modifier manuellement si besoin.
+          Ce prompt est genere depuis l'onglet Personnage. Tu peux le modifier manuellement si besoin.
         </span>
       </div>
 
@@ -130,28 +166,23 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
         <label style={styles.label}>
           Exemples ({config.examples.length})
         </label>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-          <button
-            onClick={handleImportExamples}
-            disabled={isGenerating}
-            style={styles.actionBtn}
-          >
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+          <button onClick={handleImportExamples} disabled={isGenerating} style={styles.actionBtn}>
             Importer JSON
           </button>
-          <button
-            onClick={handleExportExamples}
-            disabled={isGenerating || config.examples.length === 0}
-            style={styles.actionBtn}
-          >
+          <button onClick={handleExportExamples} disabled={isGenerating || config.examples.length === 0} style={styles.actionBtn}>
             Exporter JSON
           </button>
-          <button
-            onClick={handleClearExamples}
-            disabled={isGenerating || config.examples.length === 0}
-            style={{ ...styles.actionBtn, borderColor: '#f44336', color: '#f44336' }}
-          >
+          <button onClick={handleClearExamples} disabled={isGenerating || config.examples.length === 0}
+            style={{ ...styles.actionBtn, borderColor: '#f44336', color: '#f44336' }}>
             Tout supprimer
           </button>
+          {character && character.triggers.length > 0 && (
+            <button onClick={handleGenerateScenarios} disabled={isGenerating || generatingScenarios || !config.model}
+              style={{ ...styles.actionBtn, borderColor: '#FF9800', color: '#FF9800' }}>
+              {generatingScenarios ? 'Generation...' : 'Generer scenarios'}
+            </button>
+          )}
         </div>
 
         {config.examples.length === 0 ? (
@@ -171,7 +202,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
             </span>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 300, overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 400, overflowY: 'auto', padding: '2px 0' }}>
             {config.examples.map(ex => {
               const isExpanded = expandedExampleId === ex.id;
               return (
@@ -179,59 +210,73 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
                   background: '#1f1f1f',
                   border: '1px solid #333',
                   borderLeft: '3px solid #4CAF50',
-                  borderRadius: 4,
-                  overflow: 'hidden',
+                  borderRadius: 6,
                 }}>
+                  {/* Header row */}
                   <div
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: 8,
-                      padding: '8px 10px',
+                      padding: '10px 12px',
                       cursor: 'pointer',
-                      fontSize: 12,
+                      fontSize: 13,
                     }}
                     onClick={() => setExpandedExampleId(isExpanded ? null : ex.id)}
                   >
-                    <span style={{ fontSize: 10, color: '#666', minWidth: 12 }}>{isExpanded ? '▼' : '▶'}</span>
-                    <span style={{ color: '#4CAF50', fontFamily: 'monospace', fontWeight: 'bold', fontSize: 11 }}>#{ex.id}</span>
-                    <span style={{ color: '#aaa', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {ex.context}
+                    <span style={{ fontSize: 11, color: '#666', minWidth: 14, userSelect: 'none' }}>
+                      {isExpanded ? '\u25BC' : '\u25B6'}
+                    </span>
+                    <span style={{ color: '#4CAF50', fontFamily: 'monospace', fontWeight: 'bold', fontSize: 12 }}>
+                      #{ex.id}
+                    </span>
+                    <span style={{
+                      color: '#bbb', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      fontSize: 12,
+                    }}>
+                      {ex.context || '(pas de contexte)'}
                     </span>
                     {ex.output.tone && (
                       <span style={{
-                        fontSize: 10,
-                        color: '#888',
-                        fontWeight: 'bold',
-                        textTransform: 'uppercase',
-                        padding: '1px 6px',
-                        background: '#2a2a2a',
-                        borderRadius: 3,
+                        fontSize: 10, color: '#4CAF50', fontWeight: 'bold', textTransform: 'uppercase',
+                        padding: '2px 8px', background: '#1a2e1a', borderRadius: 4, border: '1px solid #2e5a2e',
                       }}>
                         {ex.output.tone}
                       </span>
                     )}
+                    {/* Edit button */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingExample({ ...ex }); }}
+                      style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 14, padding: '0 4px' }}
+                      title="Modifier"
+                    >
+                      {'\u270E'}
+                    </button>
+                    {/* Remove button */}
                     <button
                       onClick={(e) => { e.stopPropagation(); handleRemoveExample(ex.id); }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#f44336',
-                        cursor: 'pointer',
-                        fontSize: 14,
-                        padding: '0 4px',
-                      }}
+                      style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer', fontSize: 14, padding: '0 4px' }}
+                      title="Supprimer"
                     >
-                      x
+                      {'\u2715'}
                     </button>
                   </div>
+                  {/* Expanded details */}
                   {isExpanded && (
-                    <div style={{ padding: '8px 12px', borderTop: '1px solid #333', background: '#0f0f0f', fontSize: 12 }}>
+                    <div style={{
+                      padding: '12px 16px',
+                      borderTop: '1px solid #2a2a2a',
+                      background: '#161616',
+                      fontSize: 13,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}>
                       <ExField label="Context" value={ex.context} />
                       <ExField label="Instruction" value={ex.instruction} />
                       <ExField label="Input" value={ex.input} />
                       {Object.entries(ex.output).map(([key, val]) => (
-                        <ExField key={key} label={key} value={val} />
+                        <ExField key={key} label={`output.${key}`} value={val} />
                       ))}
                     </div>
                   )}
@@ -242,21 +287,19 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
         )}
       </div>
 
+      {/* Params row */}
       <div style={styles.row}>
-        <div style={{ ...styles.formGroup, flex: 1 }}>
+        <div style={{ ...styles.formGroup, width: '140px' }}>
           <label style={styles.label}>Nombre d'entrees</label>
-          <div style={styles.rangeRow}>
-            <input
-              type="range"
-              min="1"
-              max="500"
-              value={config.count}
-              onChange={(e) => onConfigChange({ ...config, count: parseInt(e.target.value, 10) })}
-              disabled={isGenerating}
-              style={{ flex: 1 }}
-            />
-            <span style={styles.rangeValue}>{config.count}</span>
-          </div>
+          <input
+            type="number"
+            value={config.count}
+            onChange={(e) => onConfigChange({ ...config, count: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+            disabled={isGenerating}
+            style={styles.input}
+            min="1"
+            max="5000"
+          />
         </div>
 
         <div style={{ ...styles.formGroup, width: '120px' }}>
@@ -284,14 +327,84 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
           />
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {editingExample && (
+        <div style={styles.modalOverlay} onClick={() => setEditingExample(null)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 16px', color: '#4CAF50', fontSize: 16 }}>
+              Modifier l'exemple #{editingExample.id}
+            </h3>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={styles.label}>Context</label>
+              <textarea
+                style={{ ...styles.input, ...styles.textarea, height: '60px' }}
+                value={editingExample.context}
+                onChange={e => setEditingExample({ ...editingExample, context: e.target.value })}
+              />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={styles.label}>Instruction</label>
+              <textarea
+                style={{ ...styles.input, ...styles.textarea, height: '60px' }}
+                value={editingExample.instruction}
+                onChange={e => setEditingExample({ ...editingExample, instruction: e.target.value })}
+              />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={styles.label}>Input</label>
+              <textarea
+                style={{ ...styles.input, ...styles.textarea, height: '60px' }}
+                value={editingExample.input}
+                onChange={e => setEditingExample({ ...editingExample, input: e.target.value })}
+              />
+            </div>
+
+            {/* Output fields */}
+            {Object.entries(editingExample.output).map(([key, val]) => (
+              <div key={key} style={{ marginBottom: 12 }}>
+                <label style={styles.label}>output.{key}</label>
+                <input
+                  style={styles.input}
+                  value={val}
+                  onChange={e => setEditingExample({
+                    ...editingExample,
+                    output: { ...editingExample.output, [key]: e.target.value }
+                  })}
+                />
+              </div>
+            ))}
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button
+                style={{ ...styles.actionBtn, padding: '8px 20px' }}
+                onClick={() => setEditingExample(null)}
+              >
+                Annuler
+              </button>
+              <button
+                style={{ ...styles.actionBtn, padding: '8px 20px', background: '#1b5e20', borderColor: '#4CAF50', color: '#4CAF50' }}
+                onClick={handleSaveEdit}
+              >
+                Sauvegarder
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 const ExField: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div style={{ marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid #222' }}>
-    <span style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</span>
-    <p style={{ margin: '2px 0 0', fontSize: 12, lineHeight: 1.4, color: '#ccc' }}>{value}</p>
+  <div style={{ paddingBottom: 6, borderBottom: '1px solid #222' }}>
+    <span style={{ fontSize: 10, color: '#4CAF50', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>
+      {label}
+    </span>
+    <p style={{ margin: '3px 0 0', fontSize: 13, lineHeight: 1.5, color: '#ddd', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+      {value || '(vide)'}
+    </p>
   </div>
 );
 
@@ -315,12 +428,6 @@ const styles = {
     display: 'flex',
     gap: '16px'
   } as React.CSSProperties,
-  rangeRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    marginTop: '4px'
-  } as React.CSSProperties,
   input: {
     width: '100%',
     padding: '8px 12px',
@@ -330,17 +437,12 @@ const styles = {
     color: '#e0e0e0',
     fontFamily: 'inherit',
     fontSize: '14px',
-    marginTop: '4px'
+    marginTop: '4px',
+    boxSizing: 'border-box',
   } as React.CSSProperties,
   textarea: {
     fontFamily: 'monospace',
     resize: 'vertical'
-  } as React.CSSProperties,
-  rangeValue: {
-    fontWeight: 'bold',
-    fontSize: '16px',
-    minWidth: '30px',
-    textAlign: 'right'
   } as React.CSSProperties,
   actionBtn: {
     padding: '5px 12px',
@@ -351,5 +453,27 @@ const styles = {
     cursor: 'pointer',
     fontSize: 12,
     fontWeight: 500,
+  } as React.CSSProperties,
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  } as React.CSSProperties,
+  modal: {
+    background: '#1e1e1e',
+    border: '1px solid #444',
+    borderRadius: 10,
+    padding: 24,
+    width: '90%',
+    maxWidth: 600,
+    maxHeight: '80vh',
+    overflowY: 'auto',
   } as React.CSSProperties,
 };

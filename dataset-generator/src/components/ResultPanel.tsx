@@ -1,23 +1,22 @@
 import React, { useState } from 'react';
 import { DatasetEntry, OutputFieldDefinition } from '../types';
 
-const ITEMS_PER_PAGE = 20;
-
 interface ResultPanelProps {
   entries: DatasetEntry[];
   outputFields: OutputFieldDefinition[];
+  batchSize?: number;
   onDownload: () => void;
 }
 
-export const ResultPanel: React.FC<ResultPanelProps> = ({ entries, outputFields }) => {
+export const ResultPanel: React.FC<ResultPanelProps> = ({ entries, outputFields, batchSize = 10 }) => {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [showRawJson, setShowRawJson] = useState(false);
   const [page, setPage] = useState(0);
 
-  const totalPages = Math.max(1, Math.ceil(entries.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(entries.length / batchSize));
   const pagedEntries = entries.slice(
-    page * ITEMS_PER_PAGE,
-    (page + 1) * ITEMS_PER_PAGE
+    page * batchSize,
+    (page + 1) * batchSize
   );
 
   // Reset to last page when new entries arrive and we're beyond bounds
@@ -131,7 +130,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = ({ entries, outputFields 
                   «
                 </button>
                 <span style={styles.pageInfo}>
-                  Page {page + 1} / {totalPages}
+                  Batch {page + 1} / {totalPages}
                 </span>
                 <button
                   onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}

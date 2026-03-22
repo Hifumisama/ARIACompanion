@@ -27,8 +27,6 @@ export interface Trigger {
 
 export interface SpeechStyle {
   register: string;
-  recurringExpressions: string[];
-  verbalTics: string[];
   languageNotes: string;
 }
 
@@ -46,7 +44,9 @@ export interface CharacterDefinition {
   name: string;
   universe: string;
   role: string;
+  language: string;
   backstory: string;
+  avatarBase64?: string;
   personalityAxes: PersonalityAxis[];
   emotionalModes: EmotionalMode[];
   triggers: Trigger[];

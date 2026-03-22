@@ -7,7 +7,7 @@ export function generateSystemPromptFromCharacter(char: CharacterDefinition): st
   const sections: string[] = [];
 
   // Identité
-  sections.push(`Tu es ${char.name}, ${char.role} dans l'univers de ${char.universe}.`);
+  sections.push(`Tu es ${char.name}, ${char.role} dans l'univers de ${char.universe}. Tu t'exprimes en ${char.language || 'Francais'}.`);
 
   if (char.backstory.trim()) {
     sections.push(`## Identité\n${char.backstory}`);
@@ -45,12 +45,6 @@ export function generateSystemPromptFromCharacter(char: CharacterDefinition): st
   const styleParts: string[] = [];
   if (style.register.trim()) {
     styleParts.push(`Registre: ${style.register}`);
-  }
-  if (style.recurringExpressions.length > 0) {
-    styleParts.push(`Expressions récurrentes: "${style.recurringExpressions.join('", "')}"`);
-  }
-  if (style.verbalTics.length > 0) {
-    styleParts.push(`Tics verbaux: "${style.verbalTics.join('", "')}"`);
   }
   if (style.languageNotes.trim()) {
     styleParts.push(`Notes: ${style.languageNotes}`);
@@ -132,6 +126,96 @@ export function buildOutputFormatDescription(fields: OutputFieldDefinition[]): s
       return desc;
     })
     .join('\n');
+}
+
+/**
+ * Construit la prompt de juge par défaut à partir de la fiche personnage.
+ * Critères dérivés automatiquement des axes, modes, contraintes, relations et style.
+ */
+export function buildDefaultJudgePrompt(char: CharacterDefinition): string {
+  const sections: string[] = [];
+
+  sections.push(`Tu es un juge sévère mais juste. Tu évalues des répliques écrites pour le personnage "${char.name}" (${char.role}, univers: ${char.universe}).`);
+
+  sections.push(`Chaque entrée contient: context, instruction, input, et un output JSON structuré. Tu dois noter sur 10 points.`);
+
+  // Critères depuis les axes de personnalité
+  if (char.personalityAxes.length > 0) {
+    const axesCriteria = char.personalityAxes
+      .map(a => {
+        if (a.value >= 75) return `- Le personnage doit être fortement ${a.name.toLowerCase()} (${a.value}/100). Une réplique trop douce sur cet axe doit être pénalisée.`;
+        if (a.value <= 25) return `- Le personnage a un faible niveau de ${a.name.toLowerCase()} (${a.value}/100). Une réplique trop marquée sur cet axe est incohérente.`;
+        return `- ${a.name}: niveau modéré (${a.value}/100). La réplique doit refléter ce dosage.`;
+      })
+      .join('\n');
+    sections.push(`## Critères de personnalité\n${axesCriteria}`);
+  }
+
+  // Critères depuis les modes émotionnels
+  if (char.emotionalModes.length > 0) {
+    const modeNames = char.emotionalModes.map(m => m.name).join(', ');
+    const defaultMode = char.emotionalModes.find(m => m.isDefault);
+    let modesCriteria = `- Le ton de la réplique doit correspondre à un des modes définis: ${modeNames}.`;
+    if (defaultMode) {
+      modesCriteria += `\n- En l'absence de déclencheur particulier, le mode par défaut est "${defaultMode.name}" (${defaultMode.description}).`;
+    }
+    sections.push(`## Critères de ton\n${modesCriteria}`);
+  }
+
+  // Critères depuis les contraintes
+  if (char.constraints.length > 0) {
+    const constraintsCriteria = char.constraints
+      .map(c => `- CONTRAINTE ABSOLUE: ${c.description}. Toute violation = -3 points.`)
+      .join('\n');
+    sections.push(`## Contraintes à respecter\n${constraintsCriteria}`);
+  }
+
+  // Critères depuis les relations
+  if (char.relationships.length > 0) {
+    const relCriteria = char.relationships
+      .map(r => `- Si l'interlocuteur est de type "${r.interlocutorType}": l'attitude doit être "${r.attitude}".`)
+      .join('\n');
+    sections.push(`## Critères relationnels\n${relCriteria}`);
+  }
+
+  // Critères depuis le style vocal
+  const style = char.speechStyle;
+  const styleCriteria: string[] = [];
+  if (style.register.trim()) {
+    styleCriteria.push(`- Le registre doit être: ${style.register}.`);
+  }
+  if (style.languageNotes.trim()) {
+    styleCriteria.push(`- Style attendu: ${style.languageNotes}.`);
+  }
+  if (styleCriteria.length > 0) {
+    sections.push(`## Critères de style vocal\n${styleCriteria.join('\n')}`);
+  }
+
+  // Critères depuis la structure output
+  const allFields = getAllOutputFields(char);
+  if (allFields.length > 0) {
+    const structCriteria = allFields
+      .map(f => {
+        let line = `- Le champ "${f.name}" doit être présent`;
+        if (f.required) line += ' (obligatoire)';
+        if (f.type === 'enum' && f.enumValues?.length) {
+          line += ` et contenir une valeur parmi: [${f.enumValues.join(', ')}]`;
+        }
+        return line + '.';
+      })
+      .join('\n');
+    sections.push(`## Structure de l'output\n${structCriteria}`);
+  }
+
+  // Barème
+  sections.push(`## Barème
+- 9-10: Réplique parfaite, fidèle au personnage, ton juste, style impeccable, contraintes respectées.
+- 7-8: Bonne réplique, quelques détails à affiner.
+- 5-6: Correcte mais manque de personnalité ou incohérence mineure.
+- 3-4: Problèmes notables: ton inadapté, contrainte violée, ou style hors-personnage.
+- 1-2: Réplique complètement hors-sujet ou incohérente avec le personnage.`);
+
+  return sections.join('\n\n');
 }
 
 /**

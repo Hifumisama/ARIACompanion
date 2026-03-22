@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { DatasetEntry, AffinageEntry, OutputFieldDefinition } from '../types';
-import { fetchAvailableModels, judgeEntry, regenerateEntry, generateJudgePrompt } from '../services/ollama';
+import { DatasetEntry, AffinageEntry, OutputFieldDefinition, CharacterDefinition } from '../types';
+import { fetchAvailableModels, judgeEntry, regenerateEntry, improveJudgePrompt } from '../services/ollama';
+import { buildDefaultJudgePrompt } from '../services/characterPrompt';
 import { TinderMode } from './TinderMode';
 
 interface AffinagePanelProps {
   entries: DatasetEntry[];
   systemPrompt: string;
   outputFields: OutputFieldDefinition[];
+  character: CharacterDefinition | null;
   onEntriesUpdate: (entries: DatasetEntry[]) => void;
 }
 
@@ -58,6 +60,7 @@ export const AffinagePanel: React.FC<AffinagePanelProps> = ({
   entries,
   systemPrompt,
   outputFields,
+  character,
   onEntriesUpdate
 }) => {
   const [affinageEntries, setAffinageEntries] = useState<AffinageEntry[]>([]);
@@ -222,22 +225,23 @@ export const AffinagePanel: React.FC<AffinagePanelProps> = ({
     setEditEntry(null);
   };
 
-  // Open analyze modal
+  // Open analyze modal — pre-fill with default judge prompt from character
   const openAnalyze = () => {
-    setModalPrompt('');
+    const defaultPrompt = character ? buildDefaultJudgePrompt(character) : '';
+    setModalPrompt(defaultPrompt);
     setModalModel(models[0] || '');
     setModalType('analyze');
   };
 
-  // Generate judge prompt via LLM
-  const handleGenerateJudgePrompt = async () => {
-    if (!modalModel) return;
+  // Improve judge prompt via LLM
+  const handleImproveJudgePrompt = async () => {
+    if (!modalModel || !modalPrompt.trim()) return;
     setIsGeneratingPrompt(true);
     try {
-      const generated = await generateJudgePrompt(systemPrompt, modalModel);
-      setModalPrompt(generated);
+      const improved = await improveJudgePrompt(modalPrompt, modalModel);
+      setModalPrompt(improved);
     } catch (err) {
-      showToast('Erreur lors de la generation de la prompt juge', 'error');
+      showToast('Erreur lors de l\'amelioration de la prompt juge', 'error');
       console.error(err);
     } finally {
       setIsGeneratingPrompt(false);
@@ -271,6 +275,7 @@ export const AffinagePanel: React.FC<AffinagePanelProps> = ({
           updated[idx],
           usedModel,
           usedPrompt,
+          character,
           abortRef.current.signal
         );
         updated[idx] = { ...updated[idx], judgeScore: score, judgeComment: comment };
@@ -747,17 +752,17 @@ export const AffinagePanel: React.FC<AffinagePanelProps> = ({
                   <label style={styles.smallLabel}>Prompt d'evaluation</label>
                   <div style={styles.promptActions}>
                     <button
-                      onClick={() => setModalPrompt(systemPrompt)}
+                      onClick={() => setModalPrompt(character ? buildDefaultJudgePrompt(character) : '')}
                       style={styles.btnClone}
                     >
-                      Cloner le system prompt
+                      Reinitialiser criteres
                     </button>
                     <button
-                      onClick={handleGenerateJudgePrompt}
+                      onClick={handleImproveJudgePrompt}
                       style={{ ...styles.btnClone, backgroundColor: '#1a3a2a', borderColor: '#4CAF50', color: '#4CAF50' }}
-                      disabled={isGeneratingPrompt || !modalModel}
+                      disabled={isGeneratingPrompt || !modalModel || !modalPrompt.trim()}
                     >
-                      {isGeneratingPrompt ? 'Generation...' : 'Generer prompt juge'}
+                      {isGeneratingPrompt ? 'Amelioration...' : 'Ameliorer via IA'}
                     </button>
                   </div>
                 </div>
