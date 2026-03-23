@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { DatasetEntry, OutputFieldDefinition, CharacterDefinition } from '../types';
-import { chatWithCharacter, fetchAvailableModels } from '../services/ollama';
-import { getAllOutputFields } from '../services/characterPrompt';
+import { chatWithCharacter } from '../services/ollama';
 
 interface PlaygroundMessage {
   role: 'user' | 'assistant';
@@ -17,13 +16,13 @@ interface PlaygroundPanelProps {
   onCapture: (entry: DatasetEntry) => void;
 }
 
-export const PlaygroundPanel: React.FC<PlaygroundPanelProps> = ({
+export const PlaygroundPanel = ({
   character,
   systemPrompt,
   model,
   outputFields,
   onCapture,
-}) => {
+}: PlaygroundPanelProps) => {
   const [messages, setMessages] = useState<PlaygroundMessage[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);

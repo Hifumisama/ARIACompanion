@@ -131,12 +131,12 @@ function isIdentityPhase(char: CharacterDefinition): boolean {
 
 // ── Component ──
 
-export const CharacterBuilder: React.FC<CharacterBuilderProps> = ({
+export const CharacterBuilder = ({
   characters,
   activeCharacterId,
   onCharactersChange,
   onActiveCharacterChange,
-}) => {
+}: CharacterBuilderProps) => {
   const [showPreview, setShowPreview] = useState(false);
   const [forceFullPhase, setForceFullPhase] = useState(false);
   const [models, setModels] = useState<string[]>([]);

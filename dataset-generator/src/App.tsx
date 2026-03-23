@@ -59,7 +59,7 @@ const DEFAULT_CONFIG: GenerationConfig = {
   model: ''
 };
 
-export const App: React.FC = () => {
+export const App = () => {
   const [activeTab, setActiveTab] = useState<Tab>('character');
   const [characters, setCharacters] = useState<CharacterDefinition[]>(() => {
     const stored = loadAllCharacters();

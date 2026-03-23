@@ -10,13 +10,12 @@ interface ConfigPanelProps {
   isGenerating: boolean;
 }
 
-export const ConfigPanel: React.FC<ConfigPanelProps> = ({
+export const ConfigPanel = ({
   config,
-  outputFields,
   character,
   onConfigChange,
   isGenerating
-}) => {
+}: ConfigPanelProps) => {
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedExampleId, setExpandedExampleId] = useState<number | null>(null);
@@ -397,7 +396,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   );
 };
 
-const ExField: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+const ExField = ({ label, value }: { label: string; value: string }) => (
   <div style={{ paddingBottom: 6, borderBottom: '1px solid #222' }}>
     <span style={{ fontSize: 10, color: '#4CAF50', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>
       {label}

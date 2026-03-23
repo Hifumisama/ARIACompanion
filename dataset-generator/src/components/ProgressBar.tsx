@@ -18,14 +18,14 @@ const formatTime = (ms: number): string => {
   return `${minutes}m${secs > 0 ? ` ${secs}s` : ''}`;
 };
 
-export const ProgressBar: React.FC<ProgressBarProps> = ({
+export const ProgressBar = ({
   current,
   total,
   currentBatch,
   totalBatches,
   estimatedTimeRemaining,
   averageBatchTime
-}) => {
+}: ProgressBarProps) => {
   const percentage = total === 0 ? 0 : (current / total) * 100;
 
   return (

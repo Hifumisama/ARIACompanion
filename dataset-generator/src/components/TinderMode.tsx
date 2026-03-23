@@ -9,13 +9,13 @@ interface TinderModeProps {
   onRegenerateDisliked: (disliked: AffinageEntry[]) => void;
 }
 
-export const TinderMode: React.FC<TinderModeProps> = ({
+export const TinderMode = ({
   entries,
   outputFields,
   onExit,
   onDownloadLiked,
   onRegenerateDisliked
-}) => {
+}: TinderModeProps) => {
   const [queue] = useState<AffinageEntry[]>([...entries]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [liked, setLiked] = useState<AffinageEntry[]>([]);
@@ -101,6 +101,7 @@ export const TinderMode: React.FC<TinderModeProps> = ({
           entries={disliked}
           color="#f44336"
           expandedIds={expandedDisliked}
+          outputFields={outputFields}
           onToggleExpand={(id) => toggleExpand(id, 'disliked')}
           onMoveToOpposite={(entry) => moveToOpposite(entry, 'disliked')}
           moveLabel="Deplacer vers Liked"
@@ -209,6 +210,7 @@ export const TinderMode: React.FC<TinderModeProps> = ({
           entries={liked}
           color="#4CAF50"
           expandedIds={expandedLiked}
+          outputFields={outputFields}
           onToggleExpand={(id) => toggleExpand(id, 'liked')}
           onMoveToOpposite={(entry) => moveToOpposite(entry, 'liked')}
           moveLabel="Deplacer vers Disliked"
@@ -233,7 +235,7 @@ export const TinderMode: React.FC<TinderModeProps> = ({
 
 // ── Sub-components ──
 
-const CardField: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+const CardField = ({ label, value }: { label: string; value: string }) => (
   <div style={cardFieldStyles.field}>
     <span style={cardFieldStyles.label}>{label}</span>
     <p style={cardFieldStyles.value}>{value}</p>
@@ -245,16 +247,17 @@ interface SideListProps {
   entries: AffinageEntry[];
   color: string;
   expandedIds: Set<number>;
+  outputFields: OutputFieldDefinition[];
   onToggleExpand: (id: number) => void;
   onMoveToOpposite: (entry: AffinageEntry) => void;
   moveLabel: string;
   moveColor: string;
 }
 
-const SideList: React.FC<SideListProps> = ({
-  title, entries, color, expandedIds,
+const SideList = ({
+  title, entries, color, expandedIds, outputFields,
   onToggleExpand, onMoveToOpposite, moveLabel, moveColor
-}) => (
+}: SideListProps) => (
   <div style={styles.sideList}>
     <div style={{ ...styles.sideListHeader, borderBottomColor: color }}>
       <span style={{ color }}>{title}</span>

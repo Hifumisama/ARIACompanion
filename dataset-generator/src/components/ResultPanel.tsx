@@ -8,7 +8,7 @@ interface ResultPanelProps {
   onDownload: () => void;
 }
 
-export const ResultPanel: React.FC<ResultPanelProps> = ({ entries, outputFields, batchSize = 10 }) => {
+export const ResultPanel = ({ entries, outputFields, batchSize = 10 }: ResultPanelProps) => {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [showRawJson, setShowRawJson] = useState(false);
   const [page, setPage] = useState(0);
@@ -155,11 +155,11 @@ export const ResultPanel: React.FC<ResultPanelProps> = ({ entries, outputFields,
   );
 };
 
-const Field: React.FC<{ label: string; value: string; last?: boolean }> = ({
+const Field = ({
   label,
   value,
   last
-}) => (
+}: { label: string; value: string; last?: boolean }) => (
   <div style={{ ...fieldStyles.field, ...(last ? { borderBottom: 'none', marginBottom: 0, paddingBottom: 0 } : {}) }}>
     <strong style={fieldStyles.label}>{label}</strong>
     <p style={fieldStyles.value}>{value}</p>

@@ -56,13 +56,12 @@ function playNotificationSound(success: boolean) {
   }
 }
 
-export const AffinagePanel: React.FC<AffinagePanelProps> = ({
+export const AffinagePanel = ({
   entries,
-  systemPrompt,
   outputFields,
   character,
   onEntriesUpdate
-}) => {
+}: AffinagePanelProps) => {
   const [affinageEntries, setAffinageEntries] = useState<AffinageEntry[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [expandedId, setExpandedId] = useState<number | null>(null);

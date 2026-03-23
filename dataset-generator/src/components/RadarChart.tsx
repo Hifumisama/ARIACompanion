@@ -13,7 +13,7 @@ const COLOR_FILL = 'rgba(76, 175, 80, 0.2)';
 const COLOR_GRID = '#333';
 const COLOR_LABEL = '#ccc';
 
-export const RadarChart: React.FC<RadarChartProps> = ({ axes, onChange, size = 320 }) => {
+export const RadarChart = ({ axes, onChange, size = 320 }: RadarChartProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const draggingRef = useRef<number | null>(null);
 
