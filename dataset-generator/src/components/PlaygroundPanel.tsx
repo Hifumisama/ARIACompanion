@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { DatasetEntry, OutputFieldDefinition, CharacterDefinition } from '../types';
-import { chatWithCharacter } from '../services/ollama';
+import { chatWithCharacter, fetchAvailableModels } from '../services/ollama';
 
 interface PlaygroundMessage {
   role: 'user' | 'assistant';
@@ -14,6 +14,7 @@ interface PlaygroundPanelProps {
   model: string;
   outputFields: OutputFieldDefinition[];
   onCapture: (entry: DatasetEntry) => void;
+  onModelChange?: (model: string) => void;
 }
 
 export const PlaygroundPanel = ({
@@ -22,10 +23,12 @@ export const PlaygroundPanel = ({
   model,
   outputFields,
   onCapture,
+  onModelChange,
 }: PlaygroundPanelProps) => {
   const [messages, setMessages] = useState<PlaygroundMessage[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [models, setModels] = useState<string[]>([]);
   const [captureIndex, setCaptureIndex] = useState<number | null>(null);
   const [captureForm, setCaptureForm] = useState({ context: '', instruction: '' });
   const abortRef = useRef<AbortController | null>(null);
@@ -36,6 +39,17 @@ export const PlaygroundPanel = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    fetchAvailableModels().then(m => setModels(m));
+  }, []);
+
+  const handleModelChange = useCallback((newModel: string) => {
+    if (onModelChange) onModelChange(newModel);
+    if (isStreaming) abortRef.current?.abort();
+    setMessages([]);
+    setCaptureIndex(null);
+  }, [onModelChange, isStreaming]);
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
@@ -142,13 +156,6 @@ export const PlaygroundPanel = ({
     );
   }
 
-  if (!model) {
-    return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
-        Sélectionne un modèle dans l'onglet Configuration.
-      </div>
-    );
-  }
 
   return (
     <div style={styles.container}>
@@ -157,7 +164,15 @@ export const PlaygroundPanel = ({
         <span style={styles.headerTitle}>
           Playground — {character.name || 'Sans nom'}
         </span>
-        <span style={styles.headerModel}>{model}</span>
+        <select
+          style={styles.modelSelect}
+          value={model}
+          onChange={e => handleModelChange(e.target.value)}
+          disabled={isStreaming}
+        >
+          {!model && <option value="">Choisir un modele...</option>}
+          {models.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
         <button onClick={handleReset} style={styles.resetBtn}>
           Reset
         </button>
@@ -355,12 +370,15 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#e0e0e0',
     flex: 1,
   },
-  headerModel: {
+  modelSelect: {
     fontSize: 12,
-    color: '#888',
-    padding: '2px 8px',
+    color: '#ccc',
+    padding: '4px 8px',
     background: '#2a2a2a',
-    borderRadius: 3,
+    border: '1px solid #444',
+    borderRadius: 4,
+    maxWidth: 220,
+    cursor: 'pointer',
   },
   resetBtn: {
     padding: '5px 14px',

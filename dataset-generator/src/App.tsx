@@ -2,8 +2,9 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { DatasetEntry, GenerationConfig, CharacterDefinition } from './types';
 import { generateBatch } from './services/ollama';
 import { generateSystemPromptFromCharacter, getAllOutputFields } from './services/characterPrompt';
-import { loadAllCharacters, saveCharacter } from './services/storage';
-import { DEFAULT_HADES } from './data/defaultCharacters';
+import { loadAllCharacters, saveCharacter, deleteCharacter } from './services/storage';
+import { DEFAULT_HADES, createBlankCharacter } from './data/defaultCharacters';
+import { HubPage } from './components/HubPage';
 import { ConfigPanel } from './components/ConfigPanel';
 import { ProgressBar } from './components/ProgressBar';
 import { ResultPanel } from './components/ResultPanel';
@@ -11,7 +12,7 @@ import { AffinagePanel } from './components/AffinagePanel';
 import { CharacterBuilder } from './components/CharacterBuilder';
 import { PlaygroundPanel } from './components/PlaygroundPanel';
 
-type Tab = 'character' | 'playground' | 'generation' | 'affinage';
+type Tab = 'hub' | 'character' | 'playground' | 'generation' | 'affinage';
 
 const TAB_ORDER: Tab[] = ['character', 'playground', 'generation', 'affinage'];
 
@@ -60,7 +61,7 @@ const DEFAULT_CONFIG: GenerationConfig = {
 };
 
 export const App = () => {
-  const [activeTab, setActiveTab] = useState<Tab>('character');
+  const [activeTab, setActiveTab] = useState<Tab>('hub');
   const [characters, setCharacters] = useState<CharacterDefinition[]>(() => {
     const stored = loadAllCharacters();
     return stored.length > 0 ? stored : [{ ...DEFAULT_HADES, id: crypto.randomUUID(), createdAt: Date.now(), updatedAt: Date.now() }];
@@ -188,6 +189,27 @@ export const App = () => {
     setConfig(prev => ({ ...prev, systemPrompt: derivedSystemPrompt, characterId: activeCharacterId || undefined }));
   }, [derivedSystemPrompt, activeCharacterId]);
 
+  // Hub handlers
+  const handleEditFromHub = useCallback((id: string) => {
+    setActiveCharacterId(id);
+    setActiveTab('character');
+  }, []);
+
+  const handleNewFromHub = useCallback(() => {
+    const blank = createBlankCharacter();
+    setCharacters(prev => [...prev, blank]);
+    setActiveCharacterId(blank.id);
+    setActiveTab('character');
+  }, []);
+
+  const handleDeleteFromHub = useCallback((id: string) => {
+    deleteCharacter(id);
+    setCharacters(prev => prev.filter(c => c.id !== id));
+    if (activeCharacterId === id) {
+      setActiveCharacterId(null);
+    }
+  }, [activeCharacterId]);
+
   // Navigation
   const nextTab = () => {
     const idx = TAB_ORDER.indexOf(activeTab);
@@ -201,6 +223,8 @@ export const App = () => {
     { key: 'generation', label: `Generation${entries.length > 0 ? ` (${entries.length})` : ''}` },
     { key: 'affinage', label: 'Affinage' }
   ];
+
+  const isHub = activeTab === 'hub';
 
   return (
     <div style={styles.app}>
@@ -222,42 +246,65 @@ export const App = () => {
       </div>
       <style>{`@keyframes toastSlide { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
 
-      {/* Header */}
-      <header style={styles.header}>
-        <h1 style={styles.title}>ARIA Character Builder</h1>
-      </header>
+      {isHub ? (
+        /* ── Hub Page (full screen, no header/tabs) ── */
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <HubPage
+            characters={characters}
+            onSelectCharacter={handleEditFromHub}
+            onCreateCharacter={handleNewFromHub}
+            onDeleteCharacter={handleDeleteFromHub}
+          />
+        </div>
+      ) : (
+        /* ── Workflow (header + tabs + content) ── */
+        <>
+          {/* Header */}
+          <header style={styles.header}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <button
+                onClick={() => setActiveTab('hub')}
+                style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 18, padding: '4px 8px', borderRadius: 4 }}
+                title="Retour au Hub"
+              >
+                {'\u2190'}
+              </button>
+              <h1 style={styles.title}>ARIA Character Builder</h1>
+            </div>
+          </header>
 
-      {/* Tabs */}
-      <nav style={styles.tabBar}>
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            style={{
-              ...styles.tab,
-              ...(activeTab === tab.key ? styles.tabActive : {})
-            }}
-          >
-            {tab.label}
-            {tab.key === 'generation' && isGenerating && (
-              <span style={styles.dot} />
+          {/* Tabs */}
+          <nav style={styles.tabBar}>
+            {tabs.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  ...styles.tab,
+                  ...(activeTab === tab.key ? styles.tabActive : {})
+                }}
+              >
+                {tab.label}
+                {tab.key === 'generation' && isGenerating && (
+                  <span style={styles.dot} />
+                )}
+              </button>
+            ))}
+          </nav>
+
+          {/* Tab Content */}
+          <div style={styles.content}>
+            {activeTab === 'character' && (
+              <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 60 }}>
+                <CharacterBuilder
+                  characters={characters}
+                  activeCharacterId={activeCharacterId}
+                  onCharactersChange={setCharacters}
+                  onActiveCharacterChange={setActiveCharacterId}
+                  onBackToHub={() => setActiveTab('hub')}
+                />
+              </div>
             )}
-          </button>
-        ))}
-      </nav>
-
-      {/* Tab Content */}
-      <div style={styles.content}>
-        {activeTab === 'character' && (
-          <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 60 }}>
-            <CharacterBuilder
-              characters={characters}
-              activeCharacterId={activeCharacterId}
-              onCharactersChange={setCharacters}
-              onActiveCharacterChange={setActiveCharacterId}
-            />
-          </div>
-        )}
 
         {activeTab === 'playground' && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 60 }}>
@@ -267,6 +314,7 @@ export const App = () => {
               model={config.model}
               outputFields={activeCharacter ? getAllOutputFields(activeCharacter) : []}
               onCapture={handleCapture}
+              onModelChange={(m) => setConfig(prev => ({ ...prev, model: m }))}
             />
           </div>
         )}
@@ -346,7 +394,7 @@ export const App = () => {
         )}
       </div>
 
-      {/* Fixed "Next" button — shown on all tabs except last and except generation (which has its own bar) */}
+      {/* Fixed "Next" button — shown on all tabs except last and except generation */}
       {hasNextTab && activeTab !== 'generation' && (
         <button
           onClick={nextTab}
@@ -357,6 +405,8 @@ export const App = () => {
            TAB_ORDER[TAB_ORDER.indexOf(activeTab) + 1] === 'affinage' ? 'Affinage' : 'Suivant'}
           {' \u2192'}
         </button>
+      )}
+        </>
       )}
     </div>
   );

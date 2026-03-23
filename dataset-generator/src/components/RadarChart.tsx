@@ -3,7 +3,7 @@ import { PersonalityAxis } from '../types';
 
 interface RadarChartProps {
   axes: PersonalityAxis[];
-  onChange: (axes: PersonalityAxis[]) => void;
+  onChange?: (axes: PersonalityAxis[]) => void;
   size?: number;
 }
 
@@ -14,6 +14,7 @@ const COLOR_GRID = '#333';
 const COLOR_LABEL = '#ccc';
 
 export const RadarChart = ({ axes, onChange, size = 320 }: RadarChartProps) => {
+  const readOnly = !onChange;
   const svgRef = useRef<SVGSVGElement>(null);
   const draggingRef = useRef<number | null>(null);
 
@@ -92,7 +93,7 @@ export const RadarChart = ({ axes, onChange, size = 320 }: RadarChartProps) => {
       if (draggingRef.current === null) return;
       const newVal = valueFromEvent(moveEvent, draggingRef.current);
       const newAxes = axes.map((a, i) => i === draggingRef.current ? { ...a, value: newVal } : a);
-      onChange(newAxes);
+      onChange?.(newAxes);
     };
 
     const handleMouseUp = () => {
@@ -133,12 +134,12 @@ export const RadarChart = ({ axes, onChange, size = 320 }: RadarChartProps) => {
     if (closestDist < 30) {
       const newVal = valueFromEvent(e, closestIdx);
       const newAxes = axes.map((a, i) => i === closestIdx ? { ...a, value: newVal } : a);
-      onChange(newAxes);
+      onChange?.(newAxes);
     }
   }, [axes, onChange, valueFromEvent, cx, cy, count, angleStep, startAngle]);
 
-  // Draggable points
-  const handles = axes.map((a, i) => {
+  // Draggable points (hidden in read-only mode)
+  const handles = readOnly ? [] : axes.map((a, i) => {
     const [px, py] = getPoint(i, a.value);
     return (
       <circle
@@ -188,8 +189,8 @@ export const RadarChart = ({ axes, onChange, size = 320 }: RadarChartProps) => {
       width={size}
       height={size}
       viewBox={`0 0 ${size} ${size}`}
-      style={{ display: 'block', margin: '0 auto' }}
-      onClick={handleClick}
+      style={{ display: 'block', margin: '0 auto', cursor: readOnly ? 'default' : undefined }}
+      onClick={readOnly ? undefined : handleClick}
     >
       {gridPolygons}
       {axisLines}

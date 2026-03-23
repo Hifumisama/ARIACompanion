@@ -2,15 +2,17 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { CharacterDefinition } from '../types';
 import { generateSystemPromptFromCharacter } from '../services/characterPrompt';
 import { saveCharacter, exportCharacterToJson, importCharacterFromJson } from '../services/storage';
-import { createBlankCharacter, DEFAULT_HADES } from '../data/defaultCharacters';
+// createBlankCharacter and DEFAULT_HADES are now only used from App.tsx / HubPage
 import { fetchAvailableModels, generateCharacterSheet } from '../services/ollama';
 import { RadarChart } from './RadarChart';
+import { LANGUAGES } from '../data/languages';
 
 interface CharacterBuilderProps {
   characters: CharacterDefinition[];
   activeCharacterId: string | null;
   onCharactersChange: (characters: CharacterDefinition[]) => void;
   onActiveCharacterChange: (id: string | null) => void;
+  onBackToHub?: () => void;
 }
 
 // ── Styles ──
@@ -136,6 +138,7 @@ export const CharacterBuilder = ({
   activeCharacterId,
   onCharactersChange,
   onActiveCharacterChange,
+  onBackToHub,
 }: CharacterBuilderProps) => {
   const [showPreview, setShowPreview] = useState(false);
   const [forceFullPhase, setForceFullPhase] = useState(false);
@@ -181,19 +184,6 @@ export const CharacterBuilder = ({
     onCharactersChange(newList);
   }
 
-  function handleNew() {
-    const blank = createBlankCharacter();
-    onCharactersChange([...characters, blank]);
-    onActiveCharacterChange(blank.id);
-    setForceFullPhase(false);
-  }
-
-  function handleLoadDefault() {
-    const hades = { ...DEFAULT_HADES, id: crypto.randomUUID(), createdAt: Date.now(), updatedAt: Date.now() };
-    onCharactersChange([...characters, hades]);
-    onActiveCharacterChange(hades.id);
-  }
-
   function handleSave() {
     if (!char) return;
     saveCharacter(char);
@@ -223,14 +213,6 @@ export const CharacterBuilder = ({
     input.click();
   }
 
-  function handleDelete() {
-    if (!char) return;
-    if (!confirm(`Supprimer le personnage "${char.name || 'Sans nom'}" ?`)) return;
-    const newList = characters.filter(c => c.id !== char.id);
-    onCharactersChange(newList);
-    onActiveCharacterChange(newList.length > 0 ? newList[0].id : null);
-  }
-
   async function handleGenerate() {
     if (!char || !selectedModel || !char.name.trim()) return;
     setIsGenerating(true);
@@ -253,26 +235,19 @@ export const CharacterBuilder = ({
   if (!char) {
     return (
       <div style={{ padding: 24, textAlign: 'center', color: '#999' }}>
-        <h2 style={{ color: '#eee', marginBottom: 16 }}>Character Builder</h2>
-        <p style={{ marginBottom: 24 }}>Aucun personnage selectionne. Cree-en un ou charge le template Hades.</p>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-          <button style={{ ...actionBtnStyle, background: '#1b5e20', borderColor: '#4CAF50' }} onClick={handleNew}>
-            Nouveau personnage
+        <h2 style={{ color: '#eee', marginBottom: 16 }}>Aucun personnage selectionne</h2>
+        <p style={{ marginBottom: 24 }}>Retourne au hub pour choisir ou creer un personnage.</p>
+        {onBackToHub && (
+          <button style={{ ...actionBtnStyle, background: '#1b5e20', borderColor: '#4CAF50' }} onClick={onBackToHub}>
+            Retour au Hub
           </button>
-          <button style={{ ...actionBtnStyle, background: '#1a237e', borderColor: '#5c6bc0' }} onClick={handleLoadDefault}>
-            Charger Hades (template)
-          </button>
-          <button style={actionBtnStyle} onClick={handleImport}>
-            Importer JSON
-          </button>
-        </div>
+        )}
       </div>
     );
   }
 
   // ── Shared: Identity section ──
 
-  const LANGUAGES = ['Francais', 'English', 'Espanol', 'Deutsch', 'Italiano', 'Portugues', 'Nederlands', 'Русский', '日本語', '中文'];
 
   const identitySection = (compact: boolean) => (
     <div style={sectionStyle}>
@@ -332,19 +307,7 @@ export const CharacterBuilder = ({
       <div style={{ padding: '0 16px 24px', maxWidth: 700, margin: '0 auto' }}>
         {/* Action bar */}
         <div style={actionBarStyle}>
-          <select
-            style={{ ...selectStyle, maxWidth: 220 }}
-            value={activeCharacterId || ''}
-            onChange={e => onActiveCharacterChange(e.target.value || null)}
-          >
-            {characters.map(c => (
-              <option key={c.id} value={c.id}>{c.name || 'Sans nom'}</option>
-            ))}
-          </select>
-          <button style={{ ...actionBtnStyle, background: '#1b5e20', borderColor: '#4CAF50' }} onClick={handleNew}>+ Nouveau</button>
-          <button style={{ ...actionBtnStyle, background: '#1a237e', borderColor: '#5c6bc0' }} onClick={handleLoadDefault}>+ Hades</button>
           <button style={actionBtnStyle} onClick={handleImport}>Importer</button>
-          <button style={{ ...actionBtnStyle, background: '#4a1515', borderColor: '#f44336', color: '#f44336' }} onClick={handleDelete}>Supprimer</button>
         </div>
 
         {identitySection(false)}
@@ -426,21 +389,9 @@ export const CharacterBuilder = ({
     <div style={{ padding: '0 16px 24px', maxWidth: 1200, margin: '0 auto' }}>
       {/* Action bar */}
       <div style={actionBarStyle}>
-        <select
-          style={{ ...selectStyle, maxWidth: 220 }}
-          value={activeCharacterId || ''}
-          onChange={e => onActiveCharacterChange(e.target.value || null)}
-        >
-          {characters.map(c => (
-            <option key={c.id} value={c.id}>{c.name || 'Sans nom'}</option>
-          ))}
-        </select>
-        <button style={{ ...actionBtnStyle, background: '#1b5e20', borderColor: '#4CAF50' }} onClick={handleNew}>+ Nouveau</button>
-        <button style={{ ...actionBtnStyle, background: '#1a237e', borderColor: '#5c6bc0' }} onClick={handleLoadDefault}>+ Hades</button>
         <button style={actionBtnStyle} onClick={handleSave}>Sauvegarder</button>
         <button style={actionBtnStyle} onClick={handleExport}>Exporter</button>
         <button style={actionBtnStyle} onClick={handleImport}>Importer</button>
-        <button style={{ ...actionBtnStyle, background: '#4a1515', borderColor: '#f44336', color: '#f44336' }} onClick={handleDelete}>Supprimer</button>
       </div>
 
       {/* Identity — full width, compact */}
