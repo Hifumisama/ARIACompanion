@@ -210,6 +210,16 @@ export const App = () => {
     }
   }, [activeCharacterId]);
 
+  const handleTestFromHub = useCallback((id: string) => {
+    setActiveCharacterId(id);
+    setActiveTab('playground');
+  }, []);
+
+  const handleGenerateFromHub = useCallback((id: string) => {
+    setActiveCharacterId(id);
+    setActiveTab('generation');
+  }, []);
+
   // Navigation
   const nextTab = () => {
     const idx = TAB_ORDER.indexOf(activeTab);
@@ -254,6 +264,8 @@ export const App = () => {
             onSelectCharacter={handleEditFromHub}
             onCreateCharacter={handleNewFromHub}
             onDeleteCharacter={handleDeleteFromHub}
+            onTestCharacter={handleTestFromHub}
+            onGenerateCharacter={handleGenerateFromHub}
           />
         </div>
       ) : (

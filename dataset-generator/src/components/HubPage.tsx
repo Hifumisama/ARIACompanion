@@ -80,9 +80,11 @@ interface HubPageProps {
   onSelectCharacter: (id: string) => void;
   onCreateCharacter: () => void;
   onDeleteCharacter: (id: string) => void;
+  onTestCharacter: (id: string) => void;
+  onGenerateCharacter: (id: string) => void;
 }
 
-export const HubPage = ({ characters, onSelectCharacter, onCreateCharacter, onDeleteCharacter }: HubPageProps) => {
+export const HubPage = ({ characters, onSelectCharacter, onCreateCharacter, onDeleteCharacter, onTestCharacter, onGenerateCharacter }: HubPageProps) => {
   const [flippedId, setFlippedId] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -210,6 +212,18 @@ export const HubPage = ({ characters, onSelectCharacter, onCreateCharacter, onDe
                     </div>
 
                     <div style={styles.cardActions}>
+                      <button
+                        style={styles.testButton}
+                        onClick={(e) => { e.stopPropagation(); onTestCharacter(char.id); }}
+                      >
+                        Tester
+                      </button>
+                      <button
+                        style={styles.generateButton}
+                        onClick={(e) => { e.stopPropagation(); onGenerateCharacter(char.id); }}
+                      >
+                        Generer
+                      </button>
                       <button
                         style={styles.editButton}
                         onClick={(e) => { e.stopPropagation(); onSelectCharacter(char.id); }}
@@ -512,32 +526,51 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Card actions
   cardActions: {
-    display: 'flex',
-    gap: 8,
-    padding: '12px 16px',
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 6,
+    padding: '10px 16px',
     borderTop: '1px solid #2a2a2a',
     flexShrink: 0,
   },
+  testButton: {
+    padding: '7px 0',
+    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+    border: '1px solid #2196F3',
+    color: '#2196F3',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontSize: 12,
+    fontWeight: 500,
+  },
+  generateButton: {
+    padding: '7px 0',
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    border: '1px solid #FF9800',
+    color: '#FF9800',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontSize: 12,
+    fontWeight: 500,
+  },
   editButton: {
-    flex: 1,
-    padding: '8px 0',
+    padding: '7px 0',
     backgroundColor: 'transparent',
     border: '1px solid #4CAF50',
     color: '#4CAF50',
     borderRadius: 6,
     cursor: 'pointer',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 500,
   },
   deleteButton: {
-    flex: 1,
-    padding: '8px 0',
+    padding: '7px 0',
     backgroundColor: 'transparent',
     border: '1px solid #f44336',
     color: '#f44336',
     borderRadius: 6,
     cursor: 'pointer',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 500,
   },
 
