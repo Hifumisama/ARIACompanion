@@ -91,3 +91,72 @@ export interface AffinageEntry extends DatasetEntry {
 export interface OllamaModel {
   name: string;
 }
+
+// ── Training ──
+
+export interface ModelInfo {
+  id: string;
+  name: string;
+  size: string;
+  vram_gb: number;
+  gpu_minimum: string;
+  description: string;
+}
+
+export interface HyperparamDef {
+  value: number;
+  min: number;
+  max: number;
+  tooltip: string;
+}
+
+export interface TrainingConfig {
+  dataset_path: string;
+  base_model: string;
+  output_name: string;
+  dataset_format: string;
+  lora_r: number;
+  lora_alpha: number;
+  learning_rate: number;
+  num_epochs: number;
+  micro_batch_size: number;
+  gradient_accumulation_steps: number;
+  sequence_len: number;
+  warmup_steps: number;
+  weight_decay: number;
+  quantization: string;
+}
+
+export interface TrainingProgress {
+  status: 'waiting' | 'starting' | 'loading' | 'converting' | 'training' | 'exporting' | 'done' | 'error' | 'stopped';
+  current_step?: number;
+  total_steps?: number;
+  current_epoch?: number;
+  total_epochs?: number;
+  loss?: number | null;
+  learning_rate?: number | null;
+  elapsed_seconds?: number;
+  eta_seconds?: number;
+  error?: string | null;
+  message?: string | null;
+  details?: string | null;
+  output_dir?: string;
+}
+
+export interface QuantizationOption {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface DownloadFile {
+  name: string;
+  path: string;
+  size_mb: number;
+}
+
+export interface HealthStatus {
+  status: string;
+  gpu: string;
+  vram_total_mb: number;
+}

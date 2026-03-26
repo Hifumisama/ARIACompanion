@@ -63,6 +63,13 @@ export const DEFAULT_HADES: CharacterDefinition = {
   ],
   outputFields: [
     {
+      name: 'emotion',
+      type: 'enum',
+      enumValues: ['sarcastic', 'scheming', 'annoyed', 'amused', 'furious', 'calm'],
+      description: 'Mode émotionnel du personnage',
+      required: true,
+    },
+    {
       name: 'action',
       type: 'string',
       description: 'Description d\'un geste physique ou d\'une action du personnage',
@@ -97,6 +104,13 @@ export function createBlankCharacter(): CharacterDefinition {
     constraints: [],
     relationships: [],
     outputFields: [
+      {
+        name: 'emotion',
+        type: 'enum',
+        enumValues: [],
+        description: 'Mode émotionnel du personnage',
+        required: true,
+      },
       {
         name: 'action',
         type: 'string',

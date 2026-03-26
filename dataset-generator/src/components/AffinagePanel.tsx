@@ -10,6 +10,8 @@ interface AffinagePanelProps {
   outputFields: OutputFieldDefinition[];
   character: CharacterDefinition | null;
   onEntriesUpdate: (entries: DatasetEntry[]) => void;
+  judgeModel?: string;
+  onJudgeModelChange?: (model: string) => void;
 }
 
 type ModalType = 'edit' | 'analyze' | 'regenerate' | null;
@@ -60,7 +62,8 @@ export const AffinagePanel = ({
   entries,
   outputFields,
   character,
-  onEntriesUpdate
+  onEntriesUpdate,
+  onJudgeModelChange
 }: AffinagePanelProps) => {
   const [affinageEntries, setAffinageEntries] = useState<AffinageEntry[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -201,7 +204,7 @@ export const AffinagePanel = ({
     const count = selectedIds.size;
     const remaining = affinageEntries.filter(e => !selectedIds.has(e.id));
     setAffinageEntries(remaining);
-    onEntriesUpdate(remaining.map(({ judgeScore, judgeComment, ...rest }) => rest));
+    onEntriesUpdate(remaining);
     setSelectedIds(new Set());
     showToast(`${count} entree(s) supprimee(s)`, 'success');
   };
@@ -219,7 +222,7 @@ export const AffinagePanel = ({
       e.id === editEntry.id ? { ...editEntry, judgeScore: undefined, judgeComment: undefined } : e
     );
     setAffinageEntries(updated);
-    onEntriesUpdate(updated.map(({ judgeScore, judgeComment, ...rest }) => rest));
+    onEntriesUpdate(updated);
     setModalType(null);
     setEditEntry(null);
   };
@@ -254,6 +257,7 @@ export const AffinagePanel = ({
     setModalType(null);
     setIsProcessing(true);
     setLastJudgeModel(usedModel);
+    onJudgeModelChange?.(usedModel);
     abortRef.current = new AbortController();
 
     const targetIds = selectedIds.size > 0
@@ -289,6 +293,7 @@ export const AffinagePanel = ({
 
     setIsProcessing(false);
     abortRef.current = null;
+    onEntriesUpdate(updated);
 
     if (abortRef.current === null) {
       showToast(`Analyse terminee : ${successCount}/${targetIds.length} entrees evaluees`, successCount > 0 ? 'success' : 'error');
@@ -333,7 +338,7 @@ export const AffinagePanel = ({
         );
         updated[idx] = { ...newEntry, judgeScore: undefined, judgeComment: undefined };
         setAffinageEntries([...updated]);
-        onEntriesUpdate(updated.map(({ judgeScore, judgeComment, ...rest }) => rest));
+        onEntriesUpdate(updated);
         setProcessProgress({ current: i + 1, total: targetIds.length });
         successCount++;
       } catch (err) {

@@ -11,10 +11,11 @@ import { ResultPanel } from './components/ResultPanel';
 import { AffinagePanel } from './components/AffinagePanel';
 import { CharacterBuilder } from './components/CharacterBuilder';
 import { PlaygroundPanel } from './components/PlaygroundPanel';
+import { ResultsPanel } from './components/ResultsPanel';
 
-type Tab = 'hub' | 'character' | 'playground' | 'generation' | 'affinage';
+type Tab = 'hub' | 'character' | 'playground' | 'generation' | 'affinage' | 'results';
 
-const TAB_ORDER: Tab[] = ['character', 'playground', 'generation', 'affinage'];
+const TAB_ORDER: Tab[] = ['character', 'playground', 'generation', 'affinage', 'results'];
 
 interface Toast {
   message: string;
@@ -70,6 +71,7 @@ export const App = () => {
     const stored = loadAllCharacters();
     return stored.length > 0 ? stored[0].id : null;
   });
+  const [judgeModel, setJudgeModel] = useState<string>('');
 
   useEffect(() => {
     if (!activeCharacterId && characters.length > 0) {
@@ -231,7 +233,8 @@ export const App = () => {
     { key: 'character', label: `Personnage${activeCharacter ? ` (${activeCharacter.name || '...'})` : ''}` },
     { key: 'playground', label: 'Playground' },
     { key: 'generation', label: `Generation${entries.length > 0 ? ` (${entries.length})` : ''}` },
-    { key: 'affinage', label: 'Affinage' }
+    { key: 'affinage', label: 'Affinage' },
+    { key: 'results', label: 'Résultats' }
   ];
 
   const isHub = activeTab === 'hub';
@@ -401,6 +404,20 @@ export const App = () => {
               outputFields={activeCharacter ? getAllOutputFields(activeCharacter) : []}
               character={activeCharacter}
               onEntriesUpdate={setEntries}
+              judgeModel={judgeModel}
+              onJudgeModelChange={setJudgeModel}
+            />
+          </div>
+        )}
+
+        {activeTab === 'results' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 60 }}>
+            <ResultsPanel
+              entries={entries}
+              character={activeCharacter}
+              systemPrompt={derivedSystemPrompt}
+              generatorModel={config.model}
+              judgeModel={judgeModel}
             />
           </div>
         )}
@@ -414,7 +431,8 @@ export const App = () => {
         >
           {TAB_ORDER[TAB_ORDER.indexOf(activeTab) + 1] === 'playground' ? 'Playground' :
            TAB_ORDER[TAB_ORDER.indexOf(activeTab) + 1] === 'generation' ? 'Generation' :
-           TAB_ORDER[TAB_ORDER.indexOf(activeTab) + 1] === 'affinage' ? 'Affinage' : 'Suivant'}
+           TAB_ORDER[TAB_ORDER.indexOf(activeTab) + 1] === 'affinage' ? 'Affinage' :
+           TAB_ORDER[TAB_ORDER.indexOf(activeTab) + 1] === 'results' ? 'Résultats' : 'Suivant'}
           {' \u2192'}
         </button>
       )}
