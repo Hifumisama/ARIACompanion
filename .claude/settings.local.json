@@ -5,7 +5,12 @@
       "Bash(grep -r \"calm\\\\|amused\\\\|annoyed\\\\|sarcastic\\\\|furious\\\\|scheming\" . --include=\"*.py\" --include=\"*.ts\" --include=\"*.tsx\" --include=\"*.txt\" 2>/dev/null | grep -v node_modules | grep -v \".git\" | wc -l)",
       "Bash(cd:*)",
       "WebSearch",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(for f:*)",
+      "Bash(do cp:*)",
+      "Bash(done)",
+      "Bash(cp:*)",
+      "Bash(mkdir:*)"
     ]
   }
 }

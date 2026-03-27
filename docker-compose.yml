@@ -1,76 +1,126 @@
 services:
-  model-init:
-    build: ./init
-    container_name: aria-model-init
-    volumes:
-      - ./models/llm:/models/llm
-    environment:
-      - MODEL_FILE=${MODEL_FILE:-hades-v1.gguf}
-      - LLM_REPO_ID=${LLM_REPO_ID:-Hifumisama/hades-finetune-llm-gguf}
-      - HF_TOKEN=${HF_TOKEN:-}
-    networks:
-      - aria-net
-
-  brain:
-    build: ./brain
-    container_name: aria-brain
+  # ── LLM (Ollama) ──────────────────────────────────────────────
+  aria-brain-models:
+    image: ollama/ollama
+    container_name: aria-brain-models
     ports:
-      - "${BRAIN_PORT:-8080}:8080"
+      - "${OLLAMA_PORT:-11434}:11434"
     volumes:
-      - ./models/llm:/models:ro
-    command: >
-      -m /models/${MODEL_FILE:-hades-v1.gguf}
-      --host 0.0.0.0
-      --port 8080
-      -ngl ${GPU_LAYERS:-0}
-      -c ${CONTEXT_SIZE:-4096}
-      --threads ${THREADS:-4}
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:11434/"]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 60s
-    depends_on:
-      model-init:
-        condition: service_completed_successfully
+      start_period: 30s
     networks:
       - aria-net
 
-  orchestrator:
-    build: ./orchestrator
+  aria-brain-models-init:
+    image: ollama/ollama
+    container_name: aria-brain-models-init
+    depends_on:
+      aria-brain-models:
+        condition: service_healthy
+    entrypoint: ["sh", "-c", "ollama pull ${OLLAMA_MODEL:-llama3.2}"]
+    environment:
+      - OLLAMA_HOST=http://aria-brain-models:11434
+    networks:
+      - aria-net
+
+  # ── Voice (STT + TTS) ─────────────────────────────────────────
+  aria-voice:
+    build: ./aria-voice
+    container_name: aria-voice
+    ports:
+      - "${VOICE_PORT:-8001}:8000"
+    volumes:
+      - ./aria-voice/models/piper:/app/models/piper:ro
+      - ./aria-voice/models/whisper:/app/models/whisper:rw
+    environment:
+      - WHISPER_MODEL=${WHISPER_MODEL:-small}
+      - WHISPER_LANGUAGE=${WHISPER_LANGUAGE:-fr}
+      - PIPER_MODEL_PATH=/app/models/piper/model.onnx
+      - PIPER_CONFIG_PATH=/app/models/piper/model.onnx.json
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aria-net
+
+  # ── Character Forge (Backend) ──────────────────────────────────
+  aria-character-forge-backend:
+    build: ./aria-character-forge/backend
+    container_name: aria-character-forge-backend
+    ports:
+      - "${FORGE_BACKEND_PORT:-8002}:8000"
+    volumes:
+      - forge_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aria-net
+
+  # ── Character Forge (Frontend) ─────────────────────────────────
+  aria-character-forge-frontend:
+    build: ./aria-character-forge/frontend
+    container_name: aria-character-forge-frontend
+    ports:
+      - "${FORGE_FRONTEND_PORT:-5174}:5174"
+    environment:
+      - VITE_API_URL=http://localhost:${FORGE_BACKEND_PORT:-8002}
+      - VITE_OLLAMA_URL=http://localhost:${OLLAMA_PORT:-11434}
+    depends_on:
+      - aria-character-forge-backend
+    networks:
+      - aria-net
+
+  # ── Orchestrator ───────────────────────────────────────────────
+  aria-orchestrator:
+    build: ./aria-orchestrator
     container_name: aria-orchestrator
     ports:
       - "${ORCHESTRATOR_PORT:-4545}:8000"
-    volumes:
-      - ./brain/prompts:/prompts:ro
-      - ./models/piper:/models/piper:ro
-      - ./models/whisper:/models/whisper:rw
-      - aria_memory:/app/data
     environment:
-      - BRAIN_URL=http://brain:8080
-      - SYSTEM_PROMPT_PATH=/prompts/aria.txt
-      - SUMMARY_INTERVAL=${SUMMARY_INTERVAL:-10}
-      - WHISPER_MODEL=${WHISPER_MODEL:-small}
-      - WHISPER_LANGUAGE=${WHISPER_LANGUAGE:-fr}
-      - PIPER_MODEL_PATH=/models/piper/model.onnx
-      - PIPER_CONFIG_PATH=/models/piper/model.onnx.json
+      - BRAIN_URL=http://aria-brain-models:11434
+      - VOICE_URL=http://aria-voice:8000
+      - CHARACTER_FORGE_URL=http://aria-character-forge-backend:8000
+      - ACTIVE_CHARACTER_ID=${ACTIVE_CHARACTER_ID:-}
+      - INTERRUPTION_KEYWORDS=${INTERRUPTION_KEYWORDS:-stop,arrête,tais-toi}
+      - TTS_CHUNK_SIZE=${TTS_CHUNK_SIZE:-16384}
     depends_on:
-      brain:
+      aria-brain-models:
+        condition: service_healthy
+      aria-voice:
+        condition: service_healthy
+      aria-character-forge-backend:
         condition: service_healthy
     networks:
       - aria-net
 
-  frontend:
-    build: ./frontend
-    container_name: aria-frontend
+  # ── UI Frontend ────────────────────────────────────────────────
+  aria-ui-frontend:
+    build: ./aria-ui-frontend
+    container_name: aria-ui-frontend
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     environment:
       - VITE_WS_URL=ws://localhost:${ORCHESTRATOR_PORT:-4545}/ws
       - VITE_API_URL=http://localhost:${ORCHESTRATOR_PORT:-4545}
     depends_on:
-      - orchestrator
+      - aria-orchestrator
     networks:
       - aria-net
 
@@ -79,4 +129,5 @@ networks:
     driver: bridge
 
 volumes:
-  aria_memory:
+  ollama_data:
+  forge_data:

@@ -1,188 +1,139 @@
 # ARIA Companion
 
-**Artificial Responsive Interactive Agent** — Un compagnon IA 100% local incarnant Hades, dieu des Enfers. Cynique, sarcastique, et amateur de contrats douteux.
+**Artificial Responsive Interactive Agent** — Un compagnon IA 100% local avec personnalité configurable, voix bidirectionnelle, et architecture modulaire.
 
 ## Architecture
 
 ```
-Frontend (React/Vite)
-  ├── WebSocket /ws ──────► Orchestrator (FastAPI)
-  ├── POST /stt (audio) ──►   ├── faster-whisper (STT)
-  └── POST /tts (texte) ──►   ├── piper-tts (TTS)
-                               ├── memoire glissante (JSON)
-                               └──► Brain (llama-server)
+                         ┌─────────────────────┐
+                         │  aria-ui-frontend    │
+                         │  (React + Vite)      │
+                         │  :5173               │
+                         └────────┬─────────────┘
+                                  │ WebSocket
+                         ┌────────▼─────────────┐
+                         │  aria-orchestrator    │
+                         │  (FastAPI)            │
+                         │  :4545               │
+                         └──┬──────┬──────┬─────┘
+                            │      │      │
+              HTTP /api/chat│      │      │ HTTP /stt, /tts
+                            │      │      │
+              ┌─────────────▼┐     │   ┌──▼──────────────┐
+              │ aria-brain-  │     │   │  aria-voice      │
+              │ models       │     │   │  (Whisper+Piper) │
+              │ (Ollama)     │     │   │  :8001           │
+              │ :11434       │     │   └─────────────────┘
+              └──────────────┘     │
+                                   │ HTTP /api/characters
+                         ┌─────────▼───────────┐
+                         │ aria-character-forge │
+                         │ backend  :8002       │
+                         │ frontend :5174       │
+                         │ (SQLite)             │
+                         └─────────────────────┘
 ```
 
-3 conteneurs Docker sur un reseau `aria-net` :
-- **brain** — llama.cpp (`llama-server`) avec modele GGUF
-- **orchestrator** — FastAPI + WebSocket + STT (faster-whisper) + TTS (piper)
-- **frontend** — React 19 + Vite + TypeScript, UI de chat avec audio
+7 conteneurs Docker sur un réseau `aria-net` :
 
-## Installation
+| Service | Rôle | Port |
+|---------|------|------|
+| [aria-brain-models](aria-brain-models/) | LLM via Ollama | 11434 |
+| [aria-voice](aria-voice/) | STT (Whisper) + TTS (Piper) | 8001 |
+| [aria-character-forge](aria-character-forge/) | Gestion des personnages (backend + frontend) | 8002 / 5174 |
+| [aria-orchestrator](aria-orchestrator/) | Coordinateur central (WebSocket + HTTP) | 4545 |
+| [aria-ui-frontend](aria-ui-frontend/) | Interface chat React | 5173 |
 
-### 1. Cloner et configurer
+## Prérequis
+
+- [Docker](https://docs.docker.com/get-docker/) et Docker Compose v2
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) (pour le GPU)
+
+## Démarrage rapide
 
 ```bash
 git clone <repo-url>
 cd ARIACompanion
+
+# Configurer les variables d'environnement
 cp .env.example .env
+
+# Lancer tous les services
+docker compose up --build
 ```
 
-### 2. Telecharger un modele LLM (format GGUF)
+Interfaces disponibles :
+- **Chat** : http://localhost:5173
+- **Character Forge** : http://localhost:5174
+- **Swagger Orchestrator** : http://localhost:4545/docs
+- **Swagger Voice** : http://localhost:8001/docs
+- **Swagger Character Forge** : http://localhost:8002/docs
 
-Placer un fichier `.gguf` dans `brain/models/` :
+## Voix TTS (Piper)
 
-```bash
-# Exemple avec Gemma 2 2B (quantise Q4_K_M, ~1.5 Go)
-huggingface-cli download bartowski/gemma-2-2b-it-GGUF \
-  --include "gemma-2-2b-it-Q4_K_M.gguf" \
-  --local-dir brain/models/
-
-mv brain/models/gemma-2-2b-it-Q4_K_M.gguf brain/models/model.gguf
-```
-
-> N'importe quel modele GGUF compatible llama.cpp fonctionne.
-> Adapter `MODEL_FILE` dans `.env` si le nom du fichier est different.
-
-### 3. Telecharger une voix Piper (TTS)
-
-Placer les fichiers `.onnx` et `.onnx.json` dans `models/piper/` :
+Placer les fichiers `.onnx` et `.onnx.json` dans `aria-voice/models/piper/` :
 
 ```bash
-cd models/piper
+cd aria-voice/models/piper
 
-# Voix francaise (siwis, qualite medium)
+# Voix française (siwis, qualité medium)
 wget https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx
 wget https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx.json
 
 mv fr_FR-siwis-medium.onnx model.onnx
 mv fr_FR-siwis-medium.onnx.json model.onnx.json
-
-cd ../..
 ```
 
-> Catalogue complet des voix : https://huggingface.co/rhasspy/piper-voices
-
-### 4. Modele Whisper (STT)
-
-Telecharge automatiquement au premier lancement. Par defaut : modele `small` (~460 Mo).
-
-Configurable via `WHISPER_MODEL` dans `.env` :
-- `tiny` (~75 Mo) — rapide, qualite basique
-- `base` (~140 Mo) — bon compromis vitesse/qualite
-- `small` (~460 Mo) — recommande pour le francais
-- `medium` (~1.5 Go) — meilleure qualite, plus lent
-
-### 5. Lancer
-
-```bash
-docker compose up --build
-```
-
-Ouvrir **http://localhost:5173**
+> Catalogue complet : https://huggingface.co/rhasspy/piper-voices
 
 ## Configuration
 
-Toutes les variables sont dans `.env` :
+Variables d'environnement principales (fichier `.env`) :
 
 ```env
+# Modèle LLM (Ollama)
+OLLAMA_MODEL=llama3.2          # Modèle à télécharger au démarrage
+OLLAMA_PORT=11434
+
+# Personnage actif
+ACTIVE_CHARACTER_ID=            # ID du personnage (vide = prompt par défaut)
+
 # Ports
-ORCHESTRATOR_PORT=4545    # API + WebSocket
-BRAIN_PORT=8080           # llama-server
-FRONTEND_PORT=5173        # Interface web
-
-# LLM (llama.cpp)
-MODEL_FILE=model.gguf     # Fichier dans brain/models/
-GPU_LAYERS=0              # 0 = CPU only, 99 = tout sur GPU
-CONTEXT_SIZE=4096         # Taille de la fenetre de contexte
-THREADS=4                 # Threads CPU
-
-# Memoire
-SUMMARY_INTERVAL=10       # Resume automatique tous les N messages
+ORCHESTRATOR_PORT=4545
+FRONTEND_PORT=5173
+VOICE_PORT=8001
+FORGE_BACKEND_PORT=8002
+FORGE_FRONTEND_PORT=5174
 
 # STT
-WHISPER_MODEL=small       # tiny|base|small|medium|large-v3
+WHISPER_MODEL=small             # tiny|base|small|medium|large-v3
 WHISPER_LANGUAGE=fr
+
+# TTS
+TTS_CHUNK_SIZE=16384
+
+# Interruption
+INTERRUPTION_KEYWORDS=stop,arrête,tais-toi
 ```
 
-## Utilisation
+## Modules
 
-- **Texte** : taper dans la barre de saisie et envoyer
-- **Voix** : cliquer sur MIC, parler, re-cliquer pour envoyer
-- **VOX/MUTE** : activer/couper la synthese vocale des reponses
-- **Purge** : effacer toute la memoire conversationnelle
-
-## Structure du projet
-
-```
-ARIACompanion/
-├── brain/
-│   ├── models/           # Modeles GGUF (gitignore)
-│   ├── prompts/aria.txt  # System prompt de Hades
-│   ├── Dockerfile        # llama-server
-│   └── entrypoint.sh
-├── orchestrator/
-│   ├── services/
-│   │   ├── brain.py      # Client LLM (OpenAI API)
-│   │   ├── memory.py     # Memoire glissante (JSON)
-│   │   ├── stt.py        # Speech-to-Text (faster-whisper)
-│   │   └── tts.py        # Text-to-Speech (piper)
-│   ├── pipeline.py       # Pipeline de traitement
-│   ├── main.py           # FastAPI + WebSocket
-│   └── config.py
-├── frontend/
-│   └── src/
-│       ├── components/Chat.tsx
-│       └── hooks/
-│           ├── useWebSocket.ts
-│           ├── useAudioRecording.ts
-│           └── useAudioPlayback.ts
-├── models/
-│   └── piper/            # Voix Piper (gitignore)
-├── dataset-generator/    # Outil de generation de datasets
-├── docker-compose.yml
-└── .env
-```
-
----
-
-## Roadmap
-
-### v0.1 — Le cerveau qui parle (texte)
-- Orchestrator FastAPI + llama.cpp + memoire glissante + React chat
-- System prompt "Hades" + reponses JSON (text + emotion + tone)
-- Resume automatique de la conversation
-
-### v0.2 — La voix `<-- ON EST ICI`
-- STT (faster-whisper) — speech-to-text local sur CPU
-- TTS (piper) — text-to-speech avec voix configurable
-- Pipeline : audio → texte → brain → texte → audio
-
-### v0.3 — L'interaction naturelle
-- Full-duplex WebSocket streaming (parler et ecouter en meme temps)
-- VAD (Voice Activity Detection) — detecter quand l'utilisateur parle
-- Interruption par mot-cle ou en parlant par-dessus
-
-### v0.4 — La personnalite
-- Construction d'un dataset LoRA pour le roleplay Hades
-- Fine-tuning avec adaptateur LoRA (chargeable dans llama.cpp)
-- Enrichissement du format emotions
-
-### v0.5 — L'avatar
-- Affichage d'un avatar 2D/3D anime dans le frontend
-- Animations basees sur le JSON emotion/tone
-- Synchronisation levres avec le TTS
-
----
+| Module | Description | Documentation |
+|--------|-------------|---------------|
+| `aria-brain-models` | Instance Ollama pour l'inférence LLM | [README](aria-brain-models/README.md) |
+| `aria-voice` | STT (faster-whisper) + TTS (piper-tts) | [README](aria-voice/README.md) |
+| `aria-character-forge` | Création de personnages + backend SQLite | [README](aria-character-forge/README.md) |
+| `aria-orchestrator` | Coordinateur WebSocket + HTTP | [README](aria-orchestrator/README.md) |
+| `aria-ui-frontend` | Interface chat React | [README](aria-ui-frontend/README.md) |
 
 ## Stack technique
 
-| Couche | Techno |
-|---|---|
-| LLM | llama.cpp (llama-server) |
+| Couche | Technologie |
+|--------|-------------|
+| LLM | Ollama |
 | STT | faster-whisper (CPU, int8) |
 | TTS | piper-tts (ONNX) |
-| Memoire | Resume glissant (JSON) |
 | Backend | FastAPI (Python 3.11) |
+| Base de données | SQLite (aiosqlite) |
 | Frontend | React 19 + Vite + TypeScript |
 | Infra | Docker Compose |
