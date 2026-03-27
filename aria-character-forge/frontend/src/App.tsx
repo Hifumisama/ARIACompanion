@@ -63,14 +63,23 @@ const DEFAULT_CONFIG: GenerationConfig = {
 
 export const App = () => {
   const [activeTab, setActiveTab] = useState<Tab>('hub');
-  const [characters, setCharacters] = useState<CharacterDefinition[]>(() => {
-    const stored = loadAllCharacters();
-    return stored.length > 0 ? stored : [{ ...DEFAULT_HADES, id: crypto.randomUUID(), createdAt: Date.now(), updatedAt: Date.now() }];
-  });
-  const [activeCharacterId, setActiveCharacterId] = useState<string | null>(() => {
-    const stored = loadAllCharacters();
-    return stored.length > 0 ? stored[0].id : null;
-  });
+  const [characters, setCharacters] = useState<CharacterDefinition[]>([]);
+  const [activeCharacterId, setActiveCharacterId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadAllCharacters().then((stored) => {
+      if (stored.length > 0) {
+        setCharacters(stored);
+        setActiveCharacterId(stored[0].id);
+      } else {
+        const defaultChar = { ...DEFAULT_HADES, id: crypto.randomUUID(), createdAt: Date.now(), updatedAt: Date.now() };
+        setCharacters([defaultChar]);
+        setActiveCharacterId(defaultChar.id);
+      }
+      setLoading(false);
+    });
+  }, []);
   const [judgeModel, setJudgeModel] = useState<string>('');
 
   useEffect(() => {
@@ -238,6 +247,14 @@ export const App = () => {
   ];
 
   const isHub = activeTab === 'hub';
+
+  if (loading) {
+    return (
+      <div style={{ ...styles.app, justifyContent: 'center', alignItems: 'center' }}>
+        <span style={{ color: '#888', fontSize: 16 }}>Chargement des personnages...</span>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.app}>
