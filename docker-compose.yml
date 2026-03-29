@@ -75,13 +75,14 @@ services:
 
   # ── Character Forge (Frontend) ─────────────────────────────────
   aria-character-forge-frontend:
-    build: ./aria-character-forge/frontend
+    build:
+      context: ./aria-character-forge/frontend
+      args:
+        VITE_API_URL: http://localhost:${FORGE_BACKEND_PORT:-8002}
+        VITE_OLLAMA_URL: http://localhost:${OLLAMA_PORT:-11434}
     container_name: aria-character-forge-frontend
     ports:
       - "${FORGE_FRONTEND_PORT:-5174}:5174"
-    environment:
-      - VITE_API_URL=http://localhost:${FORGE_BACKEND_PORT:-8002}
-      - VITE_OLLAMA_URL=http://localhost:${OLLAMA_PORT:-11434}
     depends_on:
       - aria-character-forge-backend
     networks:
@@ -98,11 +99,14 @@ services:
       - VOICE_URL=http://aria-voice:8000
       - CHARACTER_FORGE_URL=http://aria-character-forge-backend:8000
       - ACTIVE_CHARACTER_ID=${ACTIVE_CHARACTER_ID:-}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
       - INTERRUPTION_KEYWORDS=${INTERRUPTION_KEYWORDS:-stop,arrête,tais-toi}
       - TTS_CHUNK_SIZE=${TTS_CHUNK_SIZE:-16384}
     depends_on:
       aria-brain-models:
         condition: service_healthy
+      aria-brain-models-init:
+        condition: service_completed_successfully
       aria-voice:
         condition: service_healthy
       aria-character-forge-backend:

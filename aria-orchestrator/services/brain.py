@@ -4,7 +4,7 @@ from collections.abc import AsyncGenerator
 
 import httpx
 
-from config import BRAIN_URL
+from config import BRAIN_URL, OLLAMA_MODEL
 
 logger = logging.getLogger("aria.brain")
 
@@ -29,6 +29,7 @@ async def generate(prompt: str, system: str) -> str:
         response = await client.post(
             f"{BRAIN_URL}/api/chat",
             json={
+                "model": OLLAMA_MODEL,
                 "messages": _build_messages(prompt, system),
                 "options": _GENERATION_OPTIONS,
                 "format": "json",
@@ -47,6 +48,7 @@ async def generate_stream(prompt: str, system: str) -> AsyncGenerator[str, None]
             "POST",
             f"{BRAIN_URL}/api/chat",
             json={
+                "model": OLLAMA_MODEL,
                 "messages": _build_messages(prompt, system),
                 "options": _GENERATION_OPTIONS,
                 "format": "json",

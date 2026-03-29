@@ -96,6 +96,9 @@ async def websocket_endpoint(ws: WebSocket):
             "emotion": greeting["emotion"],
             "tone": greeting["tone"],
         })
+    except WebSocketDisconnect:
+        logger.info("Client disconnected during greeting")
+        return
     except Exception:
         logger.exception("Greeting error")
 
@@ -111,6 +114,8 @@ async def websocket_endpoint(ws: WebSocket):
     try:
         while True:
             message = await ws.receive()
+            if message.get("type") == "websocket.disconnect":
+                break
 
             if "text" in message:
                 try:

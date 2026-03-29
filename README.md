@@ -8,13 +8,13 @@
                          ┌─────────────────────┐
                          │  aria-ui-frontend    │
                          │  (React + Vite)      │
-                         │  :5173               │
+                         │  :5183               │
                          └────────┬─────────────┘
                                   │ WebSocket
                          ┌────────▼─────────────┐
                          │  aria-orchestrator    │
                          │  (FastAPI)            │
-                         │  :4545               │
+                         │  :4555               │
                          └──┬──────┬──────┬─────┘
                             │      │      │
               HTTP /api/chat│      │      │ HTTP /stt, /tts
@@ -22,27 +22,27 @@
               ┌─────────────▼┐     │   ┌──▼──────────────┐
               │ aria-brain-  │     │   │  aria-voice      │
               │ models       │     │   │  (Whisper+Piper) │
-              │ (Ollama)     │     │   │  :8001           │
-              │ :11434       │     │   └─────────────────┘
+              │ (Ollama)     │     │   │  :8011           │
+              │ :11435       │     │   └─────────────────┘
               └──────────────┘     │
                                    │ HTTP /api/characters
                          ┌─────────▼───────────┐
                          │ aria-character-forge │
-                         │ backend  :8002       │
-                         │ frontend :5174       │
+                         │ backend  :8012       │
+                         │ frontend :5184       │
                          │ (SQLite)             │
                          └─────────────────────┘
 ```
 
-7 conteneurs Docker sur un réseau `aria-net` :
+7 conteneurs Docker sur un réseau `aria-net` (ports décalés pour éviter les conflits avec les services locaux) :
 
 | Service | Rôle | Port |
 |---------|------|------|
-| [aria-brain-models](aria-brain-models/) | LLM via Ollama | 11434 |
-| [aria-voice](aria-voice/) | STT (Whisper) + TTS (Piper) | 8001 |
-| [aria-character-forge](aria-character-forge/) | Gestion des personnages (backend + frontend) | 8002 / 5174 |
-| [aria-orchestrator](aria-orchestrator/) | Coordinateur central (WebSocket + HTTP) | 4545 |
-| [aria-ui-frontend](aria-ui-frontend/) | Interface chat React | 5173 |
+| [aria-brain-models](aria-brain-models/) | LLM via Ollama | 11435 |
+| [aria-voice](aria-voice/) | STT (Whisper) + TTS (Piper) | 8011 |
+| [aria-character-forge](aria-character-forge/) | Gestion des personnages (backend + frontend) | 8012 / 5184 |
+| [aria-orchestrator](aria-orchestrator/) | Coordinateur central (WebSocket + HTTP) | 4555 |
+| [aria-ui-frontend](aria-ui-frontend/) | Interface chat React | 5183 |
 
 ## Prérequis
 
@@ -63,11 +63,11 @@ docker compose up --build
 ```
 
 Interfaces disponibles :
-- **Chat** : http://localhost:5173
-- **Character Forge** : http://localhost:5174
-- **Swagger Orchestrator** : http://localhost:4545/docs
-- **Swagger Voice** : http://localhost:8001/docs
-- **Swagger Character Forge** : http://localhost:8002/docs
+- **Chat** : http://localhost:5183
+- **Character Forge** : http://localhost:5184
+- **Swagger Orchestrator** : http://localhost:4555/docs
+- **Swagger Voice** : http://localhost:8011/docs
+- **Swagger Character Forge** : http://localhost:8012/docs
 
 ## Voix TTS (Piper)
 
@@ -93,17 +93,17 @@ Variables d'environnement principales (fichier `.env`) :
 ```env
 # Modèle LLM (Ollama)
 OLLAMA_MODEL=llama3.2          # Modèle à télécharger au démarrage
-OLLAMA_PORT=11434
+OLLAMA_PORT=11435
 
 # Personnage actif
 ACTIVE_CHARACTER_ID=            # ID du personnage (vide = prompt par défaut)
 
-# Ports
-ORCHESTRATOR_PORT=4545
-FRONTEND_PORT=5173
-VOICE_PORT=8001
-FORGE_BACKEND_PORT=8002
-FORGE_FRONTEND_PORT=5174
+# Ports (décalés pour éviter les conflits avec les services locaux)
+ORCHESTRATOR_PORT=4555
+FRONTEND_PORT=5183
+VOICE_PORT=8011
+FORGE_BACKEND_PORT=8012
+FORGE_FRONTEND_PORT=5184
 
 # STT
 WHISPER_MODEL=small             # tiny|base|small|medium|large-v3

@@ -6,6 +6,9 @@ CHARACTER_FORGE_URL = os.getenv("CHARACTER_FORGE_URL", "http://aria-character-fo
 
 ACTIVE_CHARACTER_ID = os.getenv("ACTIVE_CHARACTER_ID", "")
 
+# Ollama model name
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
+
 # TTS WebSocket streaming chunk size (bytes)
 TTS_CHUNK_SIZE = int(os.getenv("TTS_CHUNK_SIZE", "16384"))
 
